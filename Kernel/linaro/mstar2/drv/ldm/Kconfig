@@ -1,0 +1,5 @@
+config HAS_LD
+	tristate "Local Dimming"
+	help
+	    enable MStar local dimming driver.
+	    

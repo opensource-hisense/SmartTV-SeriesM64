@@ -1,0 +1,82 @@
+for compile 
+#device tree Makefile 
+arm64\boot\dts\Makefile
+
+#add muji hal folder 
+arch\arm64\Makefile
+
+#add mstar_irq.c as make target file
+mstar2\hal\muji\cpu\Makefile
+
+#remove code
+mstar2\hal\muji\cpu\chip_irq.c
+mstar2\hal\muji\cpu\chip_timer.c
+
+#make uImage
+arch/arm64/Makefile
+arch/arm64/boot/Makefile
+scripts/Makefile/Makefile.lib
+
+==========================================================
+
+================8250 uart part============================
+#change uart bank riu base address
+mstar2\hal\muji\cpu\chip_arch.c
+
+================irq part==========================
+
+#remove boot check point / enable irq/fiq merge bit
+init\main.c
+
+#add mstar_irq.c in the folder in mstar2\hal\muji\cpu
+ for interrupt related function
+#modify MAsm_CPU_GetTrailOne function
+
+mstar2\hal\muji\cpu\mstar_irq.c
+
+# gic to mstar irq porting layer / remove gic device tree init function/
+
+drivers\irqchip\irq-gic.c
+
+#add device tree gic init function  
+mstar2\hal\muji\cpu\chip_irq.c
+
+#define mstar irq bank register base
+mstar2\hal\muji\cpu\chip_int.h
+
+
+================memory part==========================
+
+#create RIU identity mapping for early uart message print
+arch\arm64\kernel\head.S
+
+#implement early printk with RIU identity mapping 
+mstar2\hal\muji\cpu\chip_early_printk.c
+
+#change early_io_map page attribute from nGnRE to nGnRnE 
+and use it to mapping RIU bank
+#add a global variable paginarch/arm64/Makefileg_init to record whether 
+paging_init is executed or not
+arch\arm64\mm\mmu.c
+
+#change PROT_DEVICE_nGnRnE/ioremap/PROT_SECT_DEVICE_nGnRnE to nGnRnE
+
+arch\arm64\include\asm\io.h
+
+#define REG access macro
+mstar2\hal\muji\cpu\chip_setup.h
+
+# merge official kernel patch
+arch\arm64\mm\ioremap.c
+
+===============SMP part=============
+
+#register/implement  Mstar smp enable function
+#merge official kernel patch to avoid kernel boot time warning
+arch\arm64\kernel\smp.c
+mstar2\hal\muji\cpu\platsmp.c
+
+=========device tree modify =========
+#give gic base address/chip name/ cpu arch/timer clock frequency
+ give SMP enable method
+arch\arm64\boot\dts\muji.dts

@@ -1,0 +1,23 @@
+config MSTAR_XC
+tristate "XC"
+help
+    enable MStar XC driver.
+
+if MSTAR_XC
+
+if MSTAR_TITANIA3
+if MSTAR_GPIO
+config MSTAR_3D_LR_REPORT
+  bool "Support 3D LR Report"
+  default n
+  help
+    Support 3D LR report
+endif
+endif
+
+
+config VERSION
+  string
+  option env="VERSION"
+
+endif

@@ -1,0 +1,9 @@
+config MSTAR_MIU
+
+tristate "MSTAR MIU"
+depends on MSTAR_CMAPOOL
+
+help
+    MStar miu driver
+default n
+    

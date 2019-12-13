@@ -1,0 +1,220 @@
+/*
+ * Copyright:
+ * ----------------------------------------------------------------------------
+ * This confidential and proprietary software may be used only as authorized
+ * by a licensing agreement from ARM Limited.
+ * (C) COPYRIGHT 2012-2013 ARM Limited, ALL RIGHTS RESERVED
+ * The entire notice above must be reproduced on all authorized copies and
+ * copies may only be made to the extent permitted by a licensing agreement
+ * from ARM Limited.
+ * ----------------------------------------------------------------------------
+ */
+
+/** @file mali_trace_none
+ *
+ * Plugin configuration file which disables all software trace-points.
+ */
+
+/** @page cinstr_swtrace_page Common Software Trace
+
+@section cinstr_swtrace_overview Overview
+
+Software trace configuration files (@ref mali_trace_none) are \#included to generate @ref cinstr_trace_event_id.
+
+Each software trace point is declared with the TRACEPOINT_DECL macro, whose arguments are;
+
+@li Enumeration member name. The enumeration names consist of a series of elements separated by a single
+underscore ('_') character. The organisation of these names is explained below.
+@li UI string for this tracepoint
+@li Format specifier string declaring the types of arguments passed for tracing. Format strings are
+explained below.
+@li Comma-separated list of argument names (for UI display purposes)
+
+
+@section cinstr_swtrace_tracepoint_names Tracepoint names
+
+The first component of all enumeration names is CINSTR.
+
+The second element is one of;
+
+@li ENTER - denotes function entry, must be paired with LEAVE
+@li LEAVE - denotes function exit, must be paired with ENTER
+@li FLOW - denotes a single point in program flow, not paired
+@li COUNT - denotes counter increment/decrement
+@li COUNTSET - denotes counter absolute value
+@li USR - user-defined event
+
+The third component is one of;
+
+@li CLIENT - denotes a DDK client API (i.e. Khronos API)
+@li DRV - denotes a DDK internal interface
+
+
+This hierarchical naming scheme allows trace viewer tools to make sensible display/grouping choices.
+
+The second element list may be extended in the future for more exotic representational forms.
+
+@section cinstr_swtrace_format_spec Format specification
+
+Arguments are passed to the CINSTR plugin using va_list, hence the datatypes of arguments must be
+available to the plugin.  It is an error to provide more format specifiers than arguments at invocation,
+or to supply arguments whose types are incompatible with the format specifiers.
+
+The '@' and 't' specifiers are treated specially:  when encountered a timestamp (for '@') or a thread ID
+(for 't') are inserted by the plugin.  When the plugin consumes one of these format specifiers it does
+NOT consume an argument from the va_list.
+
+It is recommended that '@' always precede 't', and that special format specifiers '@' or 't' precede
+non-special format specifiers.
+
+Other format specifiers are interpreted as follows;
+
+@li 'i' or 'I' - 32-bit signed or unsigned integer
+@li 'l' or 'L' - 64-bit signed or unsigned integer
+@li 'F' - 64 bit (double precision) IEEE754 floating point
+@li 'p' - A CPU void* pointer
+@li 's' - A C string
+
+@note Since arguments are passed via va_list a reduction in trace bandwidth can be achieved by removing
+trailing format specifiers without removing the arguments passed to @ref CINSTR_INTERNAL_EVENT_TRACE. This
+allows configuration subsets to be created by removal of only trailing format specifiers.
+
+
+@section cinstr_swtrace_argument_names Argument names
+
+This string may be empty, or may consist of multiple zero length names separated by commas.  There may
+be fewer/more commas than arguments.
+
+Trace-viewer tools may ignore this string, or may truncate argument lists for display if not formatted
+to its liking.
+
+
+@section cinstr_swtrace_usage Usage
+
+Example macros that users may use to simplify usage;
+
+@code
+// Tracing of function entry/exit, and flow-control
+//
+#define CMEM_CALL_TRACE_ENTER(cctx,what)  CINSTR_INTERNAL_EVENT_TRACE( cctx, CINSTR_ENTER_DRV_CMEM_##what, (u32)__LINE__, __FILE__ )
+#define CMEM_CALL_TRACE_LEAVE(cctx,what)  CINSTR_INTERNAL_EVENT_TRACE( cctx, CINSTR_LEAVE_DRV_CMEM_##what, (u32)__LINE__ )
+#define CMEM_CALL_TRACE_FLOW(cctx,what)   CINSTR_INTERNAL_EVENT_TRACE( cctx, CINSTR_FLOW_DRV_CMEM_##what,  (u32)__LINE__ )
+
+// Counter increment (or decrement) and counter value set
+//
+#define CMEM_TRACE_COUNT(cctx,what,instance,increment)  CINSTR_INTERNAL_EVENT_TRACE( cctx, CINSTR_COUNT_DRV_##what, instance, increment )
+#define CMEM_TRACE_COUNTSET(cctx,what,instance,value)   CINSTR_INTERNAL_EVENT_TRACE( cctx, CINSTR_SET_DRV_##what, instance, value )
+
+// Tracing arguments for offline modelling/reconstruction of state.  Note uses the user-defined event type.
+//
+#define CMEM_TRACE_ALLOCATOR_INIT(cctx,what,instance,memtype,properties) \
+            CINSTR_INTERNAL_EVENT_TRACE( cctx, CINSTR_USR_DRV_##what, instance, memtype, properties )
+
+#define CMEM_TRACE_ALLOCATOR_ALLOC(cctx,what,instance,allocation,size,alignment) \
+            CINSTR_INTERNAL_EVENT_TRACE( cctx, CINSTR_USR_DRV_##what, instance, allocation, size, alignment )
+
+@endcode
+
+*/
+
+/* This must be first to exclude all trace-points at compile-time.
+ */
+TRACEPOINT_DECL( CINSTR_DO_NOT_TRACE, "The following tracepoints are compiled out.", "", "" )
+TRACEPOINT_DECL( CINSTR_FLOW_DRV_CFRAME_READBACK,                         "readback",                              "@tpii", "cframe_manager,rt_specifier,mrt_index" )
+TRACEPOINT_DECL( CINSTR_FLOW_DRV_CFRAME_DISCARD,                          "discard",                               "@tpii", "cframe_manager,rt_specifier,mrt_index" )
+TRACEPOINT_DECL( CINSTR_FLOW_DRV_CFRAME_FLUSH,                            "Flush",                                 "@tppiii", "_producerof_tilelist,cframe_manager,width,height,active_render_targets" )
+TRACEPOINT_DECL( CINSTR_FLOW_DRV_CFRAME_ENQUEUE_JOBCHAIN,                 "jc_enq",                                "@tppII",  "_consumerof_tilelist,_producerof_payload,stage,flags" )
+TRACEPOINT_DECL( CINSTR_SUSPEND_DRV_CFRAME_BLOCK_IF_TOO_MANY_FLUSHES,     "too_many_flushes",                      "@tpi",   "cframe_manager,num_events" )
+TRACEPOINT_DECL( CINSTR_RESUME_DRV_CFRAME_BLOCK_IF_TOO_MANY_FLUSHES,      "",                                      "@t",     "" )
+TRACEPOINT_DECL( CINSTR_FLOW_DRV_CMAR_ENQUEUE_COMMAND,                    "cmd_enq",                               "@tppp",  "_producerof_command,event,_consumerof_payload" )
+TRACEPOINT_DECL( CINSTR_FLOW_DRV_CMAR_DEQUEUE_COMMAND,                    "cmd_deq",                               "@tpppi", "_consumerof_command,event,payload,_producerof_atom_number" )
+TRACEPOINT_DECL( CINSTR_SUSPEND_DRV_EGL_WAIT_FRAME,                       "egl_wait_frame",                        "@t",     "" )
+TRACEPOINT_DECL( CINSTR_RESUME_DRV_EGL_WAIT_FRAME,                        "",                                      "@t",     "" )
+TRACEPOINT_DECL( CINSTR_SUSPEND_DRV_EGL_WINSYS_GET_BUFFER,                "egl_getbuf",                            "@t",     "" )
+TRACEPOINT_DECL( CINSTR_RESUME_DRV_EGL_WINSYS_GET_BUFFER,                 "",                                      "@t",     "" )
+TRACEPOINT_DECL( CINSTR_ENTER_CLIENT_EGL_SWAPBUFFERS,                     "eglSwapBuffers",                        "@tIs",   "line,file" )
+TRACEPOINT_DECL( CINSTR_LEAVE_CLIENT_EGL_SWAPBUFFERS,                     "",                                      "@tI",    "line" )
+TRACEPOINT_DECL( CINSTR_FLOW_CLIENT_EGL_SWAPBUFFERS,                      "",                                      "@tI",    "line" )
+TRACEPOINT_DECL( CINSTR_SUSPEND_DRV_EGL_WAIT_FOR_FENCE_ENQUEUE,           "egl_wait_fence_enq",                    "@t",     "" )
+TRACEPOINT_DECL( CINSTR_RESUME_DRV_EGL_WAIT_FOR_FENCE_ENQUEUE,            "",                                      "@t",     "" )
+TRACEPOINT_DECL( CINSTR_FLOW_DRV_GLES_FBP_OBJECT_NEW,                     "fbp_new",                               "@tIp",   "fboname,cframe_manager" )
+TRACEPOINT_DECL( CINSTR_ENTER_CLIENT_GLES_DRAWELEMENTS,                   "glDrawElements",                        "@tIs",   "line,file" )
+TRACEPOINT_DECL( CINSTR_LEAVE_CLIENT_GLES_DRAWELEMENTS,                   "",                                      "@tI",    "line" )
+
+TRACEPOINT_DECL( CINSTR_ENTER_CLIENT_CL_ENQUEUE_NDRANGE_KERNEL,           "clEnqueueNDRangeKernel",                "@t",     "" )
+TRACEPOINT_DECL( CINSTR_LEAVE_CLIENT_CL_ENQUEUE_NDRANGE_KERNEL,           "",                                      "@t",     "" )
+TRACEPOINT_DECL( CINSTR_ENTER_CLIENT_CL_ENQUEUE_READ_BUFFER,              "clEnqueueReadBuffer",                   "@t",     "" )
+TRACEPOINT_DECL( CINSTR_LEAVE_CLIENT_CL_ENQUEUE_READ_BUFFER,              "",                                      "@t",     "" )
+TRACEPOINT_DECL( CINSTR_ENTER_CLIENT_CL_ENQUEUE_WRITE_BUFFER,             "clEnqueueWriteBuffer",                  "@t",     "" )
+TRACEPOINT_DECL( CINSTR_LEAVE_CLIENT_CL_ENQUEUE_WRITE_BUFFER,             "",                                      "@t",     "" )
+TRACEPOINT_DECL( CINSTR_ENTER_CLIENT_CL_ENQUEUE_MAP_BUFFER,               "clEnqueueMapBuffer",                    "@t",     "" )
+TRACEPOINT_DECL( CINSTR_LEAVE_CLIENT_CL_ENQUEUE_MAP_BUFFER,               "",                                      "@t",     "" )
+TRACEPOINT_DECL( CINSTR_ENTER_DRV_MCL_DISPATCH_EXECUTOR,                  "mcl_dispatch_executor",                 "@t",     "" )
+TRACEPOINT_DECL( CINSTR_LEAVE_DRV_MCL_DISPATCH_EXECUTOR,                  "",                                      "@t",     "" )
+TRACEPOINT_DECL( CINSTR_ENTER_DRV_MCL_DISPATCH_PROFILING,                 "mcl_dispatch_profiling",                "@t",     "" )
+TRACEPOINT_DECL( CINSTR_LEAVE_DRV_MCL_DISPATCH_PROFILING,                 "",                                      "@t",     "" )
+TRACEPOINT_DECL( CINSTR_ENTER_DRV_MCL_DISPATCH_TERMINATOR,                "mcl_dispatch_terminator",               "@t",     "" )
+TRACEPOINT_DECL( CINSTR_LEAVE_DRV_MCL_DISPATCH_TERMINATOR,                "",                                      "@t",     "" )
+TRACEPOINT_DECL( CINSTR_ENTER_DRV_MCL_MARSHAL_ENQUEUE,                    "mcl_marshal_enqueue",                   "@t",     "" )
+TRACEPOINT_DECL( CINSTR_LEAVE_DRV_MCL_MARSHAL_ENQUEUE,                    "",                                      "@t",     "" )
+TRACEPOINT_DECL( CINSTR_ENTER_DRV_MCL_PLUGIN_DEVICE_T6XX_CREATE_PAYLOAD,  "mcl_plugin_device_t6xx_create_payload", "@t",     "" )
+TRACEPOINT_DECL( CINSTR_LEAVE_DRV_MCL_PLUGIN_DEVICE_T6XX_CREATE_PAYLOAD,  "",                                      "@t",     "" )
+TRACEPOINT_DECL( CINSTR_ENTER_DRV_MCL_PLUGIN_MEMORY_T6XX_READ_BUFFER,     "mcl_plugin_memory_t6xx_read_buffer",    "@t",     "" )
+TRACEPOINT_DECL( CINSTR_LEAVE_DRV_MCL_PLUGIN_MEMORY_T6XX_READ_BUFFER,     "",                                      "@t",     "" )
+TRACEPOINT_DECL( CINSTR_ENTER_DRV_BUILD_SPLIT_JOB,                        "build_split_jobs",                      "@t",     "" )
+TRACEPOINT_DECL( CINSTR_LEAVE_DRV_BUILD_SPLIT_JOB,                        "",                                      "@t",     "" )
+
+TRACEPOINT_DECL( CINSTR_ENTER_DRV_CLCC_BUILD_PROGRAM,                     "clcc__build_program",                   "@t",     "" )
+TRACEPOINT_DECL( CINSTR_LEAVE_DRV_CLCC_BUILD_PROGRAM,                     "",                                      "@t",     "" )
+TRACEPOINT_DECL( CINSTR_ENTER_DRV_CLCC_INIT_PROGRAM_SOURCE,               "clcc__init_program_source",             "@t",     "" )
+TRACEPOINT_DECL( CINSTR_LEAVE_DRV_CLCC_INIT_PROGRAM_SOURCE,               "",                                      "@t",     "" )
+TRACEPOINT_DECL( CINSTR_ENTER_DRV_CLCC_PARSE_BUILD_OPTIONS,               "clcc__parse_build_options",             "@t",     "" )
+TRACEPOINT_DECL( CINSTR_LEAVE_DRV_CLCC_PARSE_BUILD_OPTIONS,               "",                                      "@t",     "" )
+TRACEPOINT_DECL( CINSTR_ENTER_DRV_CLCC_FRONTEND,                          "clcc__frontend",                        "@t",     "" )
+TRACEPOINT_DECL( CINSTR_LEAVE_DRV_CLCC_FRONTEND,                          "",                                      "@t",     "" )
+TRACEPOINT_DECL( CINSTR_ENTER_DRV_CLCC_FRONTEND_INIT_BIFL,                "clcc__frontend__init_bifl",             "@t",     "" )
+TRACEPOINT_DECL( CINSTR_LEAVE_DRV_CLCC_FRONTEND_INIT_BIFL,                "",                                      "@t",     "" )
+TRACEPOINT_DECL( CINSTR_ENTER_DRV_CLCC_FRONTEND_INIT_HEADER,              "clcc__frontend__init_header",           "@t",     "" )
+TRACEPOINT_DECL( CINSTR_LEAVE_DRV_CLCC_FRONTEND_INIT_HEADER,              "",                                      "@t",     "" )
+TRACEPOINT_DECL( CINSTR_ENTER_DRV_CLCC_FRONTEND_PARSE_AST,                "clcc__frontend__parse_ast",             "@t",     "" )
+TRACEPOINT_DECL( CINSTR_LEAVE_DRV_CLCC_FRONTEND_PARSE_AST,                "",                                      "@t",     "" )
+TRACEPOINT_DECL( CINSTR_ENTER_DRV_CLCC_MIDDLE,                            "clcc__middle",                          "@t",     "" )
+TRACEPOINT_DECL( CINSTR_LEAVE_DRV_CLCC_MIDDLE,                            "",                                      "@t",     "" )
+TRACEPOINT_DECL( CINSTR_ENTER_DRV_CLCC_MIDDLE_OPTIMIZE,                   "clcc__middle__optimize",                "@t",     "" )
+TRACEPOINT_DECL( CINSTR_LEAVE_DRV_CLCC_MIDDLE_OPTIMIZE,                   "",                                      "@t",     "" )
+TRACEPOINT_DECL( CINSTR_ENTER_DRV_CLCC_MIDDLE_EXTRACT_METADATA,           "clcc__middle__extract_metadata",        "@t",     "" )
+TRACEPOINT_DECL( CINSTR_LEAVE_DRV_CLCC_MIDDLE_EXTRACT_METADATA,           "",                                      "@t",     "" )
+TRACEPOINT_DECL( CINSTR_ENTER_DRV_CLCC_MIDDLE_LINKER,                     "clcc__middle__linker",                  "@t",     "" )
+TRACEPOINT_DECL( CINSTR_LEAVE_DRV_CLCC_MIDDLE_LINKER,                     "",                                      "@t",     "" )
+TRACEPOINT_DECL( CINSTR_ENTER_DRV_CLCC_BUILD_KERNEL,                      "clcc__build_kernel",                    "@t",     "" )
+TRACEPOINT_DECL( CINSTR_LEAVE_DRV_CLCC_BUILD_KERNEL,                      "",                                      "@t",     "" )
+TRACEPOINT_DECL( CINSTR_ENTER_DRV_CLCC_BACKEND,                           "clcc__backend",                         "@t",     "" )
+TRACEPOINT_DECL( CINSTR_LEAVE_DRV_CLCC_BACKEND,                           "",                                      "@t",     "" )
+TRACEPOINT_DECL( CINSTR_ENTER_DRV_CLCC_BACKEND_CONVERTER,                 "clcc__backend__converter",              "@t",     "" )
+TRACEPOINT_DECL( CINSTR_LEAVE_DRV_CLCC_BACKEND_CONVERTER,                 "",                                      "@t",     "" )
+TRACEPOINT_DECL( CINSTR_ENTER_DRV_CLCC_BACKEND_CMPBE_BACKEND,             "clcc__backend__cmpbe_backend",          "@t",     "" )
+TRACEPOINT_DECL( CINSTR_LEAVE_DRV_CLCC_BACKEND_CMPBE_BACKEND,             "",                                      "@t",     "" )
+TRACEPOINT_DECL( CINSTR_ENTER_DRV_CLCC_CREATE_CONTAINER,                  "clcc__create_container",                "@t",     "" )
+TRACEPOINT_DECL( CINSTR_LEAVE_DRV_CLCC_CREATE_CONTAINER,                  "",                                      "@t",     "" )
+TRACEPOINT_DECL( CINSTR_ENTER_DRV_CLCC_BUILD_FROM_BINARY,                 "clcc__build_from_binary",               "@t",     "" )
+TRACEPOINT_DECL( CINSTR_LEAVE_DRV_CLCC_BUILD_FROM_BINARY,                 "",                                      "@t",     "" )
+TRACEPOINT_DECL( CINSTR_ENTER_DRV_CLCC_BUILD_FROM_ASM,                    "clcc__build_from_asm",                  "@t",     "" )
+TRACEPOINT_DECL( CINSTR_LEAVE_DRV_CLCC_BUILD_FROM_ASM,                    "",                                      "@t",     "" )
+
+TRACEPOINT_DECL( CINSTR_RESET_CLIENT_GLES_PRIMITIVES,                     "Primitives per frame",                  "@ti",    "increment" )
+
+TRACEPOINT_DECL( CINSTR_SET_DRV_CMEM_INACTIVE_COUNT,     "CMEM Inactive Count",        "@tpi",    "instance,value" )
+TRACEPOINT_DECL( CINSTR_ENTER_DRV_CMEM_PURGE_THREAD,     "CMEM purge thread",          "@tIs",    "line,file" )
+TRACEPOINT_DECL( CINSTR_LEAVE_DRV_CMEM_PURGE_THREAD,     "",                           "@tIs",    "line,file" )
+TRACEPOINT_DECL( CINSTR_SET_DRV_CMEM_HOARD_HUNK_TOTAL,   "Hoard total bytes",          "@tpl",    "instance,value" )
+TRACEPOINT_DECL( CINSTR_SET_DRV_CMEM_HOARD_HUNK_PURGE,   "Hoard purgeable bytes",      "@tpl",    "instance,value" )
+TRACEPOINT_DECL( CINSTR_SET_DRV_CMEM_HOARD_MAP_TOTAL,    "Hoard total mapped bytes",   "@tpl",    "instance,value" )
+TRACEPOINT_DECL( CINSTR_SET_DRV_CMEM_HOARD_MAP_PURGE,    "Hoard purgeable map bytes",  "@tpl",    "instance,value" )
+
+TRACEPOINT_DECL( CINSTR_ENTER_DRV_CMEM_HMEM_HEAP_ALLOC,  "cmem_hmem_heap_alloc",       "@tIs",    "line,file" )
+TRACEPOINT_DECL( CINSTR_LEAVE_DRV_CMEM_HMEM_HEAP_ALLOC,  "",                           "@tI",     "line" )
+TRACEPOINT_DECL( CINSTR_FLOW_DRV_CMEM_HMEM_HEAP_FREE,    "cmem_hmem_heap_free",        "@tI",     "line" )
+TRACEPOINT_DECL( CINSTR_COUNT_DRV_CMEM_HMEM_HEAP_BYTES,  "HMEM heap bytes allocated",  "@tpi",    "instance,increment" )
+TRACEPOINT_DECL( CINSTR_SET_DRV_CMEM_HMEM_HEAP_BYTES,    "HMEM heap bytes allocated",  "@tpI",    "instance,value" )
+TRACEPOINT_DECL( CINSTR_USR_DRV_CMEM_HEAP_INIT,          "cmemp_heap_init",            "@tppII",  "cctx,instance,memtype,properties" )
+TRACEPOINT_DECL( CINSTR_USR_DRV_CMEM_HEAP_ALLOC,         "cmemp_heap_alloc",           "@tppII",  "instance,allocation,size,alignment" )

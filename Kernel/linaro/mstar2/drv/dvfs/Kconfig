@@ -1,0 +1,16 @@
+config MSTAR_DVFS
+bool "Mstar Dynamic Voltage and Frequency Scaling"
+depends on CPU_FREQ
+default n
+
+---help---
+    To enable or to disable Mstar dynamic voltage and frequency scaling mechanism
+
+config MSTAR_IR_BOOST
+bool "IR Boost"
+depends on MSTAR_DVFS
+default n
+
+---help---
+    Increasing CPU clock when receiving a event from input devices
+

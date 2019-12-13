@@ -1,0 +1,6 @@
+config MSTAR_XC
+tristate "XC"
+default n
+help
+    enable MStar XC driver.
+

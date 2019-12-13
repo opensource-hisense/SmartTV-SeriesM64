@@ -1,0 +1,490 @@
+<?xml version="1.0" encoding="US-ASCII" ?>
+<armcc_linux_config>
+<version>armcc5.01 build 43</version>
+<gcc_path>/arm/tools/codesourcery/linuxeabi/arm-2011q1/bin/arm-none-linux-gnueabi-gcc</gcc_path>
+<gld_path>/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/bin/ld</gld_path>
+<gas_path>/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/bin/as</gas_path>
+<gcc_version>4.5.2</gcc_version>
+<target_triple>arm-none-linux-gnueabi</target_triple>
+<gcc_system_includes>/arm/tools/codesourcery/linuxeabi/arm-2011q1/lib/gcc/arm-none-linux-gnueabi/4.5.2/include</gcc_system_includes>
+<arch name="4T" endian="little" state="thumb" interwork="default">
+    <sysroot>/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/libc/armv4t</sysroot>
+    <compiler_options>
+        <param guard="c++" inverse="false" name="-J/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/include/c++/4.5.2/" />
+        <param guard="c++" inverse="false" name="-J/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/include/c++/4.5.2/arm-none-linux-gnueabi/armv4t" />
+        <param guard="c++" inverse="false" name="-J/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/include/c++/4.5.2/backward" />
+        <param name="-J/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/libc/usr/include" />
+    </compiler_options>
+    <link_prefix_options>
+        <param name="-L--userlibpath=/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/libc/armv4t//lib" />
+        <param name="-L--userlibpath=/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/libc/armv4t//usr/lib" />
+        <param name="-L--entry=_start" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-L--pt_arm_exidx" />
+        <param guard="shared" inverse="true" name="" skip="2" />
+        <param guard="shared" inverse="false" name="-L--shared" />
+        <param guard="shared" inverse="false" name="-L--fpic" />
+        <param name="-L--dynamiclinker=/lib/ld-linux.so.3" />
+        <param name="-L--no_locals" />
+        <param name="-L--userlibpath=/arm/tools/codesourcery/linuxeabi/arm-2011q1/lib/gcc/arm-none-linux-gnueabi/4.5.2//armv4t" />
+        <param name="-L--userlibpath=/arm/tools/codesourcery/linuxeabi/arm-2011q1/lib/gcc" />
+        <param name="-L--userlibpath=/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/lib//armv4t" />
+        <param name="-L--userlibpath=/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/libc/lib" />
+        <param name="-L--userlibpath=/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/libc/usr/lib" />
+    </link_prefix_options>
+    <link_suffix_options>
+        <param guard="shared" inverse="false" name="" skip="1" />
+        <param guard="shared" inverse="true" name="/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/libc/armv4t/usr/lib/crt1.o" />
+        <param name="/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/libc/armv4t/usr/lib/crti.o" />
+        <param guard="static" inverse="true" name="" skip="1" />
+        <param guard="static" inverse="false" name="/arm/tools/codesourcery/linuxeabi/arm-2011q1/lib/gcc/arm-none-linux-gnueabi/4.5.2//armv4t/crtbeginT.o" skip="3" />
+        <param guard="shared" inverse="true" name="" skip="1" />
+        <param guard="shared" inverse="false" name="/arm/tools/codesourcery/linuxeabi/arm-2011q1/lib/gcc/arm-none-linux-gnueabi/4.5.2//armv4t/crtbeginS.o" skip="1" />
+        <param name="/arm/tools/codesourcery/linuxeabi/arm-2011q1/lib/gcc/arm-none-linux-gnueabi/4.5.2//armv4t/crtbegin.o" />
+        <param guard="static" inverse="true" name="" skip="7" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc.a" skip="1" />
+        <param name="-Llibgcc.a" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc_eh.a" skip="1" />
+        <param name="-Llibgcc_eh.a" />
+        <param name="" skip="7" />
+        <param guard="static-libgcc" inverse="true" name="" skip="6" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc.a" skip="1" />
+        <param name="-Llibgcc.a" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc_eh.a" skip="1" />
+        <param name="-Llibgcc_eh.a" />
+        <param guard="static" inverse="false" name="" skip="16" />
+        <param guard="static-libgcc" inverse="false" name="" skip="15" />
+        <param guard="shared-libgcc" inverse="false" name="" skip="7" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc.a" skip="1" />
+        <param name="-Llibgcc.a" />
+        <param name="-L--as-needed" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc_s.so" />
+        <param name="-L--no-as-needed" />
+        <param guard="shared-libgcc" inverse="true" name="" skip="6" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc_s.so" />
+        <param guard="shared" inverse="false" name="" skip="3" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc.a" skip="1" />
+        <param name="-Llibgcc.a" />
+        <param guard="pthread" inverse="true" name="" skip="3" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibpthread.so" skip="1" />
+        <param name="-Llibpthread.a" />
+        <param guard="shared" inverse="true" name="" skip="3" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibc.so" skip="1" />
+        <param name="-Llibc.a" />
+        <param guard="shared" inverse="false" name="" skip="3" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibc.so" skip="1" />
+        <param name="-Llibc.a" />
+        <param guard="static" inverse="false" name="" skip="32" />
+        <param guard="static" inverse="true" name="" skip="7" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc.a" skip="1" />
+        <param name="-Llibgcc.a" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc_eh.a" skip="1" />
+        <param name="-Llibgcc_eh.a" />
+        <param name="" skip="7" />
+        <param guard="static-libgcc" inverse="true" name="" skip="6" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc.a" skip="1" />
+        <param name="-Llibgcc.a" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc_eh.a" skip="1" />
+        <param name="-Llibgcc_eh.a" />
+        <param guard="static" inverse="false" name="" skip="16" />
+        <param guard="static-libgcc" inverse="false" name="" skip="15" />
+        <param guard="shared-libgcc" inverse="false" name="" skip="7" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc.a" skip="1" />
+        <param name="-Llibgcc.a" />
+        <param name="-L--as-needed" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc_s.so" />
+        <param name="-L--no-as-needed" />
+        <param guard="shared-libgcc" inverse="true" name="" skip="6" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc_s.so" />
+        <param guard="shared" inverse="false" name="" skip="3" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc.a" skip="1" />
+        <param name="-Llibgcc.a" />
+        <param guard="shared" inverse="true" name="" skip="1" />
+        <param guard="shared" inverse="false" name="/arm/tools/codesourcery/linuxeabi/arm-2011q1/lib/gcc/arm-none-linux-gnueabi/4.5.2//armv4t/crtendS.o" skip="1" />
+        <param name="/arm/tools/codesourcery/linuxeabi/arm-2011q1/lib/gcc/arm-none-linux-gnueabi/4.5.2//armv4t/crtend.o" />
+        <param name="/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/libc/armv4t/usr/lib/crtn.o" />
+        <param guard="c++" inverse="false" name="-L--library=stdc++" />
+        <param guard="c++" inverse="false" name="-L--library=m" />
+        <param name="-L/arm/tools/arm/rvct/5.01.43/lib/armlib/arm_linux/armlinux_tf.l" />
+    </link_suffix_options>
+</arch>
+<arch name="4T" endian="little" state="default" interwork="default">
+    <sysroot>/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/libc/armv4t</sysroot>
+    <compiler_options>
+        <param guard="c++" inverse="false" name="-J/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/include/c++/4.5.2/" />
+        <param guard="c++" inverse="false" name="-J/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/include/c++/4.5.2/arm-none-linux-gnueabi/armv4t" />
+        <param guard="c++" inverse="false" name="-J/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/include/c++/4.5.2/backward" />
+        <param name="-J/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/libc/usr/include" />
+    </compiler_options>
+    <link_prefix_options>
+        <param name="-L--userlibpath=/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/libc/armv4t//lib" />
+        <param name="-L--userlibpath=/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/libc/armv4t//usr/lib" />
+        <param name="-L--entry=_start" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-L--pt_arm_exidx" />
+        <param guard="shared" inverse="true" name="" skip="2" />
+        <param guard="shared" inverse="false" name="-L--shared" />
+        <param guard="shared" inverse="false" name="-L--fpic" />
+        <param name="-L--dynamiclinker=/lib/ld-linux.so.3" />
+        <param name="-L--no_locals" />
+        <param name="-L--userlibpath=/arm/tools/codesourcery/linuxeabi/arm-2011q1/lib/gcc/arm-none-linux-gnueabi/4.5.2//armv4t" />
+        <param name="-L--userlibpath=/arm/tools/codesourcery/linuxeabi/arm-2011q1/lib/gcc" />
+        <param name="-L--userlibpath=/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/lib//armv4t" />
+        <param name="-L--userlibpath=/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/libc/lib" />
+        <param name="-L--userlibpath=/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/libc/usr/lib" />
+    </link_prefix_options>
+    <link_suffix_options>
+        <param guard="shared" inverse="false" name="" skip="1" />
+        <param guard="shared" inverse="true" name="/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/libc/armv4t/usr/lib/crt1.o" />
+        <param name="/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/libc/armv4t/usr/lib/crti.o" />
+        <param guard="static" inverse="true" name="" skip="1" />
+        <param guard="static" inverse="false" name="/arm/tools/codesourcery/linuxeabi/arm-2011q1/lib/gcc/arm-none-linux-gnueabi/4.5.2//armv4t/crtbeginT.o" skip="3" />
+        <param guard="shared" inverse="true" name="" skip="1" />
+        <param guard="shared" inverse="false" name="/arm/tools/codesourcery/linuxeabi/arm-2011q1/lib/gcc/arm-none-linux-gnueabi/4.5.2//armv4t/crtbeginS.o" skip="1" />
+        <param name="/arm/tools/codesourcery/linuxeabi/arm-2011q1/lib/gcc/arm-none-linux-gnueabi/4.5.2//armv4t/crtbegin.o" />
+        <param guard="static" inverse="true" name="" skip="7" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc.a" skip="1" />
+        <param name="-Llibgcc.a" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc_eh.a" skip="1" />
+        <param name="-Llibgcc_eh.a" />
+        <param name="" skip="7" />
+        <param guard="static-libgcc" inverse="true" name="" skip="6" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc.a" skip="1" />
+        <param name="-Llibgcc.a" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc_eh.a" skip="1" />
+        <param name="-Llibgcc_eh.a" />
+        <param guard="static" inverse="false" name="" skip="16" />
+        <param guard="static-libgcc" inverse="false" name="" skip="15" />
+        <param guard="shared-libgcc" inverse="false" name="" skip="7" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc.a" skip="1" />
+        <param name="-Llibgcc.a" />
+        <param name="-L--as-needed" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc_s.so" />
+        <param name="-L--no-as-needed" />
+        <param guard="shared-libgcc" inverse="true" name="" skip="6" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc_s.so" />
+        <param guard="shared" inverse="false" name="" skip="3" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc.a" skip="1" />
+        <param name="-Llibgcc.a" />
+        <param guard="pthread" inverse="true" name="" skip="3" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibpthread.so" skip="1" />
+        <param name="-Llibpthread.a" />
+        <param guard="shared" inverse="true" name="" skip="3" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibc.so" skip="1" />
+        <param name="-Llibc.a" />
+        <param guard="shared" inverse="false" name="" skip="3" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibc.so" skip="1" />
+        <param name="-Llibc.a" />
+        <param guard="static" inverse="false" name="" skip="32" />
+        <param guard="static" inverse="true" name="" skip="7" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc.a" skip="1" />
+        <param name="-Llibgcc.a" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc_eh.a" skip="1" />
+        <param name="-Llibgcc_eh.a" />
+        <param name="" skip="7" />
+        <param guard="static-libgcc" inverse="true" name="" skip="6" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc.a" skip="1" />
+        <param name="-Llibgcc.a" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc_eh.a" skip="1" />
+        <param name="-Llibgcc_eh.a" />
+        <param guard="static" inverse="false" name="" skip="16" />
+        <param guard="static-libgcc" inverse="false" name="" skip="15" />
+        <param guard="shared-libgcc" inverse="false" name="" skip="7" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc.a" skip="1" />
+        <param name="-Llibgcc.a" />
+        <param name="-L--as-needed" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc_s.so" />
+        <param name="-L--no-as-needed" />
+        <param guard="shared-libgcc" inverse="true" name="" skip="6" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc_s.so" />
+        <param guard="shared" inverse="false" name="" skip="3" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc.a" skip="1" />
+        <param name="-Llibgcc.a" />
+        <param guard="shared" inverse="true" name="" skip="1" />
+        <param guard="shared" inverse="false" name="/arm/tools/codesourcery/linuxeabi/arm-2011q1/lib/gcc/arm-none-linux-gnueabi/4.5.2//armv4t/crtendS.o" skip="1" />
+        <param name="/arm/tools/codesourcery/linuxeabi/arm-2011q1/lib/gcc/arm-none-linux-gnueabi/4.5.2//armv4t/crtend.o" />
+        <param name="/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/libc/armv4t/usr/lib/crtn.o" />
+        <param guard="c++" inverse="false" name="-L--library=stdc++" />
+        <param guard="c++" inverse="false" name="-L--library=m" />
+        <param name="-L/arm/tools/arm/rvct/5.01.43/lib/armlib/arm_linux/armlinux_tf.l" />
+    </link_suffix_options>
+</arch>
+<arch name="7" endian="little" state="thumb" interwork="default">
+    <sysroot>/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/libc/thumb2</sysroot>
+    <compiler_options>
+        <param guard="c++" inverse="false" name="-J/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/include/c++/4.5.2/" />
+        <param guard="c++" inverse="false" name="-J/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/include/c++/4.5.2/arm-none-linux-gnueabi/thumb2" />
+        <param guard="c++" inverse="false" name="-J/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/include/c++/4.5.2/backward" />
+        <param name="-J/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/libc/usr/include" />
+    </compiler_options>
+    <link_prefix_options>
+        <param name="-L--userlibpath=/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/libc/thumb2//lib" />
+        <param name="-L--userlibpath=/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/libc/thumb2//usr/lib" />
+        <param name="-L--entry=_start" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-L--pt_arm_exidx" />
+        <param guard="shared" inverse="true" name="" skip="2" />
+        <param guard="shared" inverse="false" name="-L--shared" />
+        <param guard="shared" inverse="false" name="-L--fpic" />
+        <param name="-L--dynamiclinker=/lib/ld-linux.so.3" />
+        <param name="-L--no_locals" />
+        <param name="-L--userlibpath=/arm/tools/codesourcery/linuxeabi/arm-2011q1/lib/gcc/arm-none-linux-gnueabi/4.5.2//thumb2" />
+        <param name="-L--userlibpath=/arm/tools/codesourcery/linuxeabi/arm-2011q1/lib/gcc" />
+        <param name="-L--userlibpath=/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/lib//thumb2" />
+        <param name="-L--userlibpath=/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/libc/lib" />
+        <param name="-L--userlibpath=/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/libc/usr/lib" />
+    </link_prefix_options>
+    <link_suffix_options>
+        <param guard="shared" inverse="false" name="" skip="1" />
+        <param guard="shared" inverse="true" name="/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/libc/thumb2/usr/lib/crt1.o" />
+        <param name="/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/libc/thumb2/usr/lib/crti.o" />
+        <param guard="static" inverse="true" name="" skip="1" />
+        <param guard="static" inverse="false" name="/arm/tools/codesourcery/linuxeabi/arm-2011q1/lib/gcc/arm-none-linux-gnueabi/4.5.2//thumb2/crtbeginT.o" skip="3" />
+        <param guard="shared" inverse="true" name="" skip="1" />
+        <param guard="shared" inverse="false" name="/arm/tools/codesourcery/linuxeabi/arm-2011q1/lib/gcc/arm-none-linux-gnueabi/4.5.2//thumb2/crtbeginS.o" skip="1" />
+        <param name="/arm/tools/codesourcery/linuxeabi/arm-2011q1/lib/gcc/arm-none-linux-gnueabi/4.5.2//thumb2/crtbegin.o" />
+        <param guard="static" inverse="true" name="" skip="7" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc.a" skip="1" />
+        <param name="-Llibgcc.a" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc_eh.a" skip="1" />
+        <param name="-Llibgcc_eh.a" />
+        <param name="" skip="7" />
+        <param guard="static-libgcc" inverse="true" name="" skip="6" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc.a" skip="1" />
+        <param name="-Llibgcc.a" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc_eh.a" skip="1" />
+        <param name="-Llibgcc_eh.a" />
+        <param guard="static" inverse="false" name="" skip="16" />
+        <param guard="static-libgcc" inverse="false" name="" skip="15" />
+        <param guard="shared-libgcc" inverse="false" name="" skip="7" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc.a" skip="1" />
+        <param name="-Llibgcc.a" />
+        <param name="-L--as-needed" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc_s.so" />
+        <param name="-L--no-as-needed" />
+        <param guard="shared-libgcc" inverse="true" name="" skip="6" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc_s.so" />
+        <param guard="shared" inverse="false" name="" skip="3" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc.a" skip="1" />
+        <param name="-Llibgcc.a" />
+        <param guard="pthread" inverse="true" name="" skip="3" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibpthread.so" skip="1" />
+        <param name="-Llibpthread.a" />
+        <param guard="shared" inverse="true" name="" skip="3" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibc.so" skip="1" />
+        <param name="-Llibc.a" />
+        <param guard="shared" inverse="false" name="" skip="3" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibc.so" skip="1" />
+        <param name="-Llibc.a" />
+        <param guard="static" inverse="false" name="" skip="32" />
+        <param guard="static" inverse="true" name="" skip="7" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc.a" skip="1" />
+        <param name="-Llibgcc.a" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc_eh.a" skip="1" />
+        <param name="-Llibgcc_eh.a" />
+        <param name="" skip="7" />
+        <param guard="static-libgcc" inverse="true" name="" skip="6" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc.a" skip="1" />
+        <param name="-Llibgcc.a" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc_eh.a" skip="1" />
+        <param name="-Llibgcc_eh.a" />
+        <param guard="static" inverse="false" name="" skip="16" />
+        <param guard="static-libgcc" inverse="false" name="" skip="15" />
+        <param guard="shared-libgcc" inverse="false" name="" skip="7" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc.a" skip="1" />
+        <param name="-Llibgcc.a" />
+        <param name="-L--as-needed" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc_s.so" />
+        <param name="-L--no-as-needed" />
+        <param guard="shared-libgcc" inverse="true" name="" skip="6" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc_s.so" />
+        <param guard="shared" inverse="false" name="" skip="3" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc.a" skip="1" />
+        <param name="-Llibgcc.a" />
+        <param guard="shared" inverse="true" name="" skip="1" />
+        <param guard="shared" inverse="false" name="/arm/tools/codesourcery/linuxeabi/arm-2011q1/lib/gcc/arm-none-linux-gnueabi/4.5.2//thumb2/crtendS.o" skip="1" />
+        <param name="/arm/tools/codesourcery/linuxeabi/arm-2011q1/lib/gcc/arm-none-linux-gnueabi/4.5.2//thumb2/crtend.o" />
+        <param name="/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/libc/thumb2/usr/lib/crtn.o" />
+        <param guard="c++" inverse="false" name="-L--library=stdc++" />
+        <param guard="c++" inverse="false" name="-L--library=m" />
+        <param name="-L/arm/tools/arm/rvct/5.01.43/lib/armlib/arm_linux/armlinux_5f.l" />
+    </link_suffix_options>
+</arch>
+<arch name="default" endian="little" state="default" interwork="default">
+    <sysroot>/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/libc</sysroot>
+    <compiler_options>
+        <param guard="c++" inverse="false" name="-J/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/include/c++/4.5.2" />
+        <param guard="c++" inverse="false" name="-J/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/include/c++/4.5.2/arm-none-linux-gnueabi" />
+        <param guard="c++" inverse="false" name="-J/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/include/c++/4.5.2/backward" />
+        <param name="-J/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/libc/usr/include" />
+    </compiler_options>
+    <link_prefix_options>
+        <param name="-L--userlibpath=/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/libc//lib" />
+        <param name="-L--userlibpath=/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/libc//usr/lib" />
+        <param name="-L--entry=_start" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-L--pt_arm_exidx" />
+        <param guard="shared" inverse="true" name="" skip="2" />
+        <param guard="shared" inverse="false" name="-L--shared" />
+        <param guard="shared" inverse="false" name="-L--fpic" />
+        <param name="-L--dynamiclinker=/lib/ld-linux.so.3" />
+        <param name="-L--no_locals" />
+        <param name="-L--userlibpath=/arm/tools/codesourcery/linuxeabi/arm-2011q1/lib/gcc/arm-none-linux-gnueabi/4.5.2" />
+        <param name="-L--userlibpath=/arm/tools/codesourcery/linuxeabi/arm-2011q1/lib/gcc" />
+        <param name="-L--userlibpath=/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/lib" />
+        <param name="-L--userlibpath=/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/libc/lib" />
+        <param name="-L--userlibpath=/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/libc/usr/lib" />
+    </link_prefix_options>
+    <link_suffix_options>
+        <param guard="shared" inverse="false" name="" skip="1" />
+        <param guard="shared" inverse="true" name="/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/libc//usr/lib/crt1.o" />
+        <param name="/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/libc//usr/lib/crti.o" />
+        <param guard="static" inverse="true" name="" skip="1" />
+        <param guard="static" inverse="false" name="/arm/tools/codesourcery/linuxeabi/arm-2011q1/lib/gcc/arm-none-linux-gnueabi/4.5.2//crtbeginT.o" skip="3" />
+        <param guard="shared" inverse="true" name="" skip="1" />
+        <param guard="shared" inverse="false" name="/arm/tools/codesourcery/linuxeabi/arm-2011q1/lib/gcc/arm-none-linux-gnueabi/4.5.2//crtbeginS.o" skip="1" />
+        <param name="/arm/tools/codesourcery/linuxeabi/arm-2011q1/lib/gcc/arm-none-linux-gnueabi/4.5.2//crtbegin.o" />
+        <param guard="static" inverse="true" name="" skip="7" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc.a" skip="1" />
+        <param name="-Llibgcc.a" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc_eh.a" skip="1" />
+        <param name="-Llibgcc_eh.a" />
+        <param name="" skip="7" />
+        <param guard="static-libgcc" inverse="true" name="" skip="6" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc.a" skip="1" />
+        <param name="-Llibgcc.a" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc_eh.a" skip="1" />
+        <param name="-Llibgcc_eh.a" />
+        <param guard="static" inverse="false" name="" skip="16" />
+        <param guard="static-libgcc" inverse="false" name="" skip="15" />
+        <param guard="shared-libgcc" inverse="false" name="" skip="7" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc.a" skip="1" />
+        <param name="-Llibgcc.a" />
+        <param name="-L--as-needed" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc_s.so" />
+        <param name="-L--no-as-needed" />
+        <param guard="shared-libgcc" inverse="true" name="" skip="6" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc_s.so" />
+        <param guard="shared" inverse="false" name="" skip="3" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc.a" skip="1" />
+        <param name="-Llibgcc.a" />
+        <param guard="pthread" inverse="true" name="" skip="3" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibpthread.so" skip="1" />
+        <param name="-Llibpthread.a" />
+        <param guard="shared" inverse="true" name="" skip="3" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibc.so" skip="1" />
+        <param name="-Llibc.a" />
+        <param guard="shared" inverse="false" name="" skip="3" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibc.so" skip="1" />
+        <param name="-Llibc.a" />
+        <param guard="static" inverse="false" name="" skip="32" />
+        <param guard="static" inverse="true" name="" skip="7" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc.a" skip="1" />
+        <param name="-Llibgcc.a" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc_eh.a" skip="1" />
+        <param name="-Llibgcc_eh.a" />
+        <param name="" skip="7" />
+        <param guard="static-libgcc" inverse="true" name="" skip="6" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc.a" skip="1" />
+        <param name="-Llibgcc.a" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc_eh.a" skip="1" />
+        <param name="-Llibgcc_eh.a" />
+        <param guard="static" inverse="false" name="" skip="16" />
+        <param guard="static-libgcc" inverse="false" name="" skip="15" />
+        <param guard="shared-libgcc" inverse="false" name="" skip="7" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc.a" skip="1" />
+        <param name="-Llibgcc.a" />
+        <param name="-L--as-needed" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc_s.so" />
+        <param name="-L--no-as-needed" />
+        <param guard="shared-libgcc" inverse="true" name="" skip="6" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc_s.so" />
+        <param guard="shared" inverse="false" name="" skip="3" />
+        <param guard="static" inverse="false" name="" skip="1" />
+        <param guard="static" inverse="true" name="-Llibgcc.a" skip="1" />
+        <param name="-Llibgcc.a" />
+        <param guard="shared" inverse="true" name="" skip="1" />
+        <param guard="shared" inverse="false" name="/arm/tools/codesourcery/linuxeabi/arm-2011q1/lib/gcc/arm-none-linux-gnueabi/4.5.2//crtendS.o" skip="1" />
+        <param name="/arm/tools/codesourcery/linuxeabi/arm-2011q1/lib/gcc/arm-none-linux-gnueabi/4.5.2//crtend.o" />
+        <param name="/arm/tools/codesourcery/linuxeabi/arm-2011q1/arm-none-linux-gnueabi/libc//usr/lib/crtn.o" />
+        <param guard="c++" inverse="false" name="-L--library=stdc++" />
+        <param guard="c++" inverse="false" name="-L--library=m" />
+        <param name="-L/arm/tools/arm/rvct/5.01.43/lib/armlib/arm_linux/armlinux_5f.l" />
+    </link_suffix_options>
+</arch>
+</armcc_linux_config>

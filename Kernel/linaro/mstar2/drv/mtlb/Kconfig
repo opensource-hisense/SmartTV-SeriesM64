@@ -1,0 +1,9 @@
+config MSTAR_MTLB
+
+tristate "MSTAR MTLB"
+depends on MP_ION_PATCH_MSTAR_CUSTOMER_IOCTL 
+
+help
+    MStar mtlb driver function
+default n
+    

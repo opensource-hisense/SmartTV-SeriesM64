@@ -1,0 +1,9 @@
+config MSTAR_CPU_IDLE
+	bool "CPU Idle Driver for Mstar processors"
+	depends on CPU_IDLE
+	default y
+	help
+	  Select this to enable cpuidle on Mstar processors.
+
+
+

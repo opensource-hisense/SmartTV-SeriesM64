@@ -1,0 +1,970 @@
+# This confidential and proprietary software may be used only as
+# authorised by a licensing agreement from ARM Limited
+# (C) COPYRIGHT 2010-2013 ARM Limited
+# ALL RIGHTS RESERVED
+# The entire notice above must be reproduced on all authorised
+# copies and copies may only be made to the extent permitted
+# by a licensing agreement from ARM Limited.
+
+EnsurePythonVersion( 2, 6 )
+EnsureSConsVersion( 2, 0 )
+
+import os, sys
+
+import SCons.Action
+import SCons.Builder
+import subprocess
+
+from env_config_abstr  import *
+from os_abstr  import get_build_os
+from platform_abstr import get_build_platform
+
+from utils import load_profiles, get_available_profiles, lib_target, prog_target, OrderedListVariable, expand_list
+from opencl_platform_config import *
+from monolithic import static_library_emitter_method, program_build_emitter, post_script_processing, shared_library_emitter_method, list_declared_libs, shared_object_emitter_method, static_object_emitter_method, list_declared_objects
+from version_info import REVISION
+
+# =============================================================================
+# use the list of profiles to set default values
+#
+vars = Variables (None)
+vars = Variables(load_profiles(ARGLIST))
+
+# determine available software trace configurations
+#
+swtrace_configs = [cfg.name for cfg in Glob('cinstr/role/*')]
+
+# Supported command-line options
+#
+# Note that we use enumeration variables rather than boolean-variables
+# because booleans with CPPDEFINES result in values 'True' or 'False'
+# which the C preprocessor doesn't understand as 0/1.
+#
+# Each option has a string that indicates its purpose - "build" means that it
+# affects the build, "profile" to indicate a profile that can be loaded to get
+# a predefined set of options, "misc" for everything else.
+# Only "build" options are used when constructing the variant name
+#
+supported_options = [
+('build',EnumVariable('debug',      'Include runtime debug code', 0, allowed_values=Split('0 1') )),
+('build',EnumVariable('release',    'Build for a customer release', 0, allowed_values=Split('0 1') )),
+('build',EnumVariable('symbols',    'Include symbolic debugging information in binaries', 1, allowed_values=Split('0 1') )),
+('build',EnumVariable('instr',      'Choose instrumentation level (0=none, 1=release, 2=debug)', '0', allowed_values=Split('0 1 2') )),
+('build',EnumVariable('no_clang',   'Disable clang frontend (0=do not disable, 1=disable)', '0', allowed_values=Split('0 1') )),
+('build',EnumVariable('swtrace',    'Choose a software trace configuration file', 'mali_trace_none', allowed_values=swtrace_configs )),
+('build',EnumVariable('dump',       'Toggle dumping (0=off, 1=on)', '0', allowed_values=Split('0 1') )),
+('build',EnumVariable('gator',      'Include gator support (0=no, 1=yes). Allows Mali profiling via Streamline. Works with Linux/Android plus real hardware', '0', allowed_values=Split('0 1') )),
+('build',EnumVariable('streamline_annotate', 'Enable streamline annotation support (0=no, 1=yes)', '0', allowed_values=Split('0 1'))),
+('build',EnumVariable('unit',       'Build unit-tests', 0, allowed_values=Split('0 1') )),
+('build',EnumVariable('bench',      'Build benchmark-tests. Enables the user to control the number of used cores and the thread migration policy,', 0, allowed_values=Split('0 1') )),
+('build',EnumVariable('perf',       'Build internal performance tests', 0, allowed_values=Split('0 1') )),
+('build',EnumVariable('no_syncsets','OBSOLETE - Build driver without cmem syncsets', 0, allowed_values=Split('0 1') )),
+('build',EnumVariable('system',     'Build system-tests. You need to build the whole driver when specifying this option.', 0, allowed_values=Split('0 1') )),
+('build',EnumVariable('arch',       'Choose architecture', 'x86_32', allowed_values=Split('x86_32 x86_64 arm_v7 arm_v8') )),
+('build',EnumVariable('core',       'Choose core to optimize for', 'cortex-a9', allowed_values=Split('cortex-a9 cortex-a12 cortex-a15') )), # MStar: added cortex-a12
+('build',EnumVariable('os',         'Choose target OS', 'linux', allowed_values=Split('linux osx android') )),
+('build',EnumVariable('toolchain',  'Choose target toolchain', 'gnu', allowed_values=Split('gnu rvct') )),
+('misc',('toolchain_prefix_target', 'Prefix to use for target toolchain. Default is "arm-none-linux-gnueabi-" for arm_v7, "aarch64-linux-gnu-" for arm_v8 and none for target X86', '')),
+('misc',('toolchain_prefix_host',   'Prefix to use for host toolchain. Default is "arm-none-linux-gnueabi-" for arm and none for target X86', '')),
+('build',EnumVariable('winsys',     'Choose target windowing system', 'dummy', allowed_values=Split('0 fbdev dummy android x11 directfb wayland gm multi') )),
+('profile',EnumVariable('profile',  'Choose a profile [pre-packaged set of default command line options]', None, allowed_values=get_available_profiles() )),
+('build',OrderedListVariable('opencl_devices', 'DEPRECATED - Choose a number of opencl devices', None, Split('t6xx mock cpu arm') )),
+('build',('opencl_platform_config', 'Select an OpenCL platform configuration', None)),
+('build',EnumVariable('ee',         'DEPRECATED - Enable UTF trapping of assertion failure errors', 0, allowed_values=Split('0 1') ) ),
+('build',EnumVariable('hw',         'DEPRECATED - Choose hardware backend (0=dummy model, 1=real model, 2=real hw)', 0, allowed_values=Split('0 1 2') ) ),
+('build',EnumVariable('dummy_model','DEPRECATED - Enable Dummy Model (0=normal, 1=dummy model)', 0, allowed_values=Split('0 1') ) ),
+('build',EnumVariable('backend',    'kernel=kernel space, user=user space', 'user', allowed_values=Split('kernel user') ) ),
+('build',EnumVariable('mali_model', '0=targeting mali hw (default), 1=targeting mali model', 0, allowed_values=Split('0 1') ) ),
+('build',EnumVariable('no_mali',    'Bypass the HW/model, use the dummy model instead (0=normal, 1=bypass mali, 2=backend default)', 2, allowed_values=Split('0 1 2') ) ),
+('build',EnumVariable('gpu',        'Choose GPU product id', 't60x', allowed_values=Split('t60x t62x t67x t76x t72x') ) ),
+('build',EnumVariable('hwver',      'Choose GPU hardware revision', 'r0p0_eac', allowed_values=Split('r0p0 r0p0_eac r0p1 r0p2 r1p0 r0p0_beta none') ) ),
+('build',EnumVariable('coverage',   'Enable Bullseye code coverage', 0, allowed_values=Split('0 1') ) ),
+('build',('coverage_regions',       'Comma separated list of coverage regions used by Bullseye (if coverage=1) - defaults to all regions', None)),
+('build',EnumVariable('gles',       'Enable build for OpenGL ES 1.1, 2.0, and 3.0', 1, allowed_values=Split('0 1') ) ),
+('build',EnumVariable('gles_qa',    'Enable debug support for OpenGL ES 1.1 and 2.0', 0, allowed_values=Split('0 1') ) ),
+('build',EnumVariable('gles_experimental',    'Enable experimental GLES features', 0, allowed_values=Split('0 1') ) ),
+('build',EnumVariable('disable_advanced_opts', 'Disable advanced optimizations (0=keep default options, 1=disable)', 0, allowed_values=Split('0 1'))),
+('build',EnumVariable('deterministic_perf', 'Enable deterministic performance. Used for driver instrumentation and is unsuitable for release builds. (0=disable, 1=enable)', 0, allowed_values=Split('0 1'))),
+('build',EnumVariable('cl',         'Enable build for OpenCL', 1, allowed_values=Split('0 1') ) ),
+('build',EnumVariable('cl_qa',      'Enable build for OpenCL qa', 0, allowed_values=Split('0 1') ) ),
+('build',EnumVariable('cl_experimental', 'Enable experimental OpenCL features', 0, allowed_values=Split('0 1') ) ),
+('build',EnumVariable('cl_gpu_ptr_size', 'Choose between 32-bit or 64-bit GPU pointers for OpenCL', 64, allowed_values=Split('32 64') ) ),
+('build',EnumVariable('egl',        'Enable build for EGL', 1, allowed_values=Split('0 1') ) ),
+('build',EnumVariable('ump',        'Enable build for UMP', 1, allowed_values=Split('0 1') ) ),
+('build',EnumVariable('ump_ion',    'Enable build of the ION import module for UMP', 0, allowed_values=Split('0 1') ) ),
+('build',ListVariable('base_qa',    'Enable build for base qa', 'none', ['leak', 'resfail', 'use-after-free', 'infinite-cache'] ) ),
+('build',EnumVariable('random_delay', 'Enable random delays to aid finding race conditions. The environmental variable MALI_OSU_DELAY_SEED should hold the seed.', 
+                                       0, allowed_values=Split('0 1') ) ),
+('build',EnumVariable('mali_license_is_gpl',        'Enable build for GPL compliant driver', 1, allowed_values=Split('0 1') ) ),
+('build',('platform_config', 'Choose a platform configuration', 'gpu_default')),
+('build',EnumVariable('cmem_qa',    'Define at which level of Quality Assurance you want to build CMEM: (0) OFF  (1) Recommended for fault finding  (2) Maximum debugging'
+                                     , 0, allowed_values=Split('0 1 2') )),
+('misc',EnumVariable('ccache',      'Enable ccache for the build.  Requires ccache installed.  Location of the cache is controlled by the CCACHE_DIR environment variable.  [default = $HOME/.ccache]', 0, allowed_values=Split('0 1') )),
+('misc',('llvm_cache_dir',          'Set the llvm cache directory.  [default = /arm/projectscratch/mpd/mdpti]', None )),
+('misc',EnumVariable('llvm_cache_mode', 'Set the llvm cache mode, Off, ReadOnly or ReadWrite.', 'RW', allowed_values=Split('OFF RO RW') )),
+('build',EnumVariable('flavour',    'Enable build with certain flavour.', 'small', allowed_values=Split('small fast') )),
+('build',EnumVariable('thumb',      'Enable build for thumb.', '1', allowed_values=Split('0 1') )),
+('build',EnumVariable('floatabi',   'ARM floating-point ABI.', 'softfp', allowed_values=Split('softfp hard'))),
+('build',EnumVariable('optimize',   'Enable optimization build', 0, allowed_values=Split('0 1') )),
+('build',EnumVariable('simd',        'Enable use of a SIMD ISA (if supported)', '0', allowed_values=Split('0 1') ) ),
+('misc',EnumVariable('v',           'Enable verbose output', 0, allowed_values=Split('0 1') )),
+('build',EnumVariable('valgrind',   'Include additional instrumentation needed by valgrind', 0, allowed_values=Split('0 1') )),
+('misc',EnumVariable('model',       'Build of model used', 'release', allowed_values=Split('debug release') )),
+('misc',ListVariable('model_opts',  'Model options', 'none', ['none'] )),
+('misc',('progs_install',           'Installation path for programs', None)),
+('misc',('libs_install',            'Installation path for libraries', None)),
+('misc',EnumVariable('error_inject','Enable error injection in the Midgar dummy model:0 off, 1 user driven, 2 random', 0, allowed_values=Split('0 1 2') )),
+('build',EnumVariable('winsys_dma_buf', 'Enable building Android winsys with dma_buf support, instead of default UMP.', '0', allowed_values=Split('0 1') )),
+('build',EnumVariable('x11_async_pageflip','Enable KDS asynchronous page flips for X11', 1, allowed_values=Split('0 1') )),
+('build',EnumVariable('android_version', 'Version of Android to build for', 'jbmr1.1', allowed_values=Split('jbmr1 jbmr1.1 jbmr2 future') )),
+('build',('android_module_owner', 'Value for LOCAL_MODULE_OWNER in Android.mk', 'none' ) ),
+('build',('android_gralloc_path', 'Override path for the Gralloc library headers. Will be added to LOCAL_C_INCLUDES in Android.mk', 'none' ) ),
+('build',EnumVariable('gralloc', 'Enable building of the Gralloc library', '1', allowed_values=Split('0 1') )),
+('build',EnumVariable('winsys_platform_reference', 'Use the reference winsys rather than the platform winsys.', 0, allowed_values=Split('0 1') )),
+('build',EnumVariable('android_egl_cfg', 'Enable exporting the egl.cfg file for Android builds', '1', allowed_values=Split('0 1') )),
+('build',EnumVariable('kernel_modules', 'Enable building of Kernel modules', 1, allowed_values=Split('0 1') )),
+('build',EnumVariable('force_fragment_order', 'Force global fragment job dependencies', 0, allowed_values=Split('0 1') )),
+('build',EnumVariable('cycle_counter', 'Enable usage of cycle counter for profiling', 0, allowed_values=Split('0 1') )),
+('build',EnumVariable('fbd', 'Enable the usage of the Multiple target Frame Buffer Descriptor', 'gpu_default', allowed_values=Split('single multiple gpu_default') )),
+('build',EnumVariable('tls_core_num', 'Force the TLS area to be large enough to contain data for tls_core_num cores', 0, allowed_values=Split('0 1 2 4 6 8 16 32') )),
+('build',EnumVariable('android_release', 'Generate release version of Android.mk', 0, allowed_values=Split('0 1') )),
+('build',EnumVariable('gles1',      'Deprecated.', -1, allowed_values=Split('-1 0 1') )),
+('build',EnumVariable('gles2',      'Deprecated.', -1, allowed_values=Split('-1 0 1') )),
+('build',EnumVariable('bl',         'big.Little migration', 'none', allowed_values=Split('none cs hmp') )),
+('build',EnumVariable('afbc',       'Enable use of AFBC (if supported by hardware)', '1', allowed_values=Split('0 1') ) ),
+('build',EnumVariable('drm_test_interactive', 'Enable user interaction in the DRM integration suite. This must not be used for automated tests.', 0, allowed_values=Split('0 1') )),
+# MStar options
+('build',EnumVariable('mstar', 'Enable MStar custom-build', 1, allowed_values=['1'])),
+('build',('mstar_platform','The target MStar platform', None)),
+('build',('project','The project name', None)),
+('build',('mali_max_freq', 'The maximum frequency of Mali', 0)),
+('build',('mali_min_freq', 'The minimum frequency of Mali', 0)),
+('build',('mali_base_address', 'The start address of Mali I/O memory region', 0)),
+('build',('mali_irq', 'Mali IRQ number', 0)),
+('build',EnumVariable('fixed_device_id', 'Use fixed device ID', 0, allowed_values=Split('0 1'))),
+('build',EnumVariable('ump_monolithic', 'Enable build of monolithic UMP kernel driver', 1, allowed_values=Split('0 1'))),
+('build',EnumVariable('ump_pa', 'Enable build of the physical address import module for UMP', 1, allowed_values=Split('0 1'))),
+('build',EnumVariable('directfb', 'Enable DirectFB winsys layer', 0, allowed_values=Split('0 1'))),
+('build',EnumVariable('wayland', 'Enable Wayland winsys layer', 0, allowed_values=Split('0 1'))),
+('build',EnumVariable('gm', 'Enable LGE GM winsys layer', 0, allowed_values=Split('0 1'))),
+('build',EnumVariable('directfb_version', 'Choose DirectFB version', None, allowed_values=Split('1.4.2'))),
+('build',EnumVariable('wayland_version', 'Choose Wayland version', None, allowed_values=Split('1.0.3'))),
+]
+
+for opt, option in supported_options:
+	vars.Add(option)
+
+# We will attempt to import the following environment variables into a construction environment
+# If a variable is not set, catch the exception silently and consider the next in the list.
+# Special case for HOME, which is used by the code coverage tool - set this to the current
+# working directory, and MALI_RELEASE_NAME, which defaults to the identifier of the releae.
+# LM_LICENSE_FILE and ARMINC are needed to enable the RVCT compiler.
+imports = ('PATH', 'HOME', 'ARCH', 'KDIR', 'CROSS_COMPILE', 'BULLSEYE_DIR', 'COVFILE', 'COVCCFG',
+			'COVFILELIST', 'CCACHE_DIR', 'CCACHE_LOGFILE', 'MALI_RELEASE_NAME','LM_LICENSE_FILE','ARMINC',
+			'UMP_RELEASE_NAME')
+
+env_vars = {
+			'MALI_RELEASE_NAME': 'r4p0-02rel0-CL%s' % REVISION,
+			'UMP_RELEASE_NAME': 'r4p0-02rel0-CL%s' % REVISION,
+}
+
+for env_var in imports:
+	try:
+		env_vars = dict({env_var : os.environ[env_var]}, **env_vars)
+	except:
+		if env_var == 'HOME':
+			env_vars = dict({env_var : os.getcwd()}, **env_vars)
+		# NOTE: release name should not be modified
+		# elif env_var == 'MALI_RELEASE_NAME':
+		# 	env_vars = dict({env_var : "r4p0-02rel0"}, **env_vars)
+		elif env_var == 'ARCH':
+			env_vars = dict({env_var : "arm"}, **env_vars) # MStar: default to arm
+		elif env_var == 'CROSS_COMPILE':
+			env_vars = dict({env_var : "arm-none-linux-gnueabi-"}, **env_vars) # MStar: default to arm-none-linux-gnueabi-
+		else:
+			pass
+
+cpp_defines = {
+		'MALI_DEBUG':                 '${debug}',
+		'MALI_INSTRUMENTATION_LEVEL': '${instr}',
+		'MALI_GATOR_SUPPORT':         '${gator}',
+		'MALI_STREAMLINE_ANNOTATE':   '${streamline_annotate}',
+		'MALI_UNIT_TEST':             '${unit}',
+		'MALI_BENCHMARK_TEST':        '${bench}',
+		'MALI_PERF_TEST':             '${perf}',
+		'MALI_SYSTEM_TEST':           '${system}',
+		'MALI_NO_MALI':               '${no_mali}',
+		'MALI_USE_GLES':              '${gles}',
+		'MALI_GLES_EXPERIMENTAL':     '${gles_experimental}',
+		'MALI_DISABLE_ADVANCED_OPTIMIZATIONS': '${disable_advanced_opts}',
+		'MALI_DETERMINISTIC_PERFORMANCE': '${deterministic_perf}',
+		'MALI_USE_EGL':               '${egl}',
+		'MALI_USE_CL':                '${cl}',
+		'MALI_USE_UMP':               '${ump}',
+		'MALI_CMEM_QA':               '${cmem_qa}',
+		'MALI_OSU_RANDOM_DELAY_ENABLED': '${random_delay}',
+		'MALI_LICENSE_IS_GPL':        '${mali_license_is_gpl}',
+		'MALI_GLES_QA':               '${gles_qa}',
+		'MALI_RELEASE_NAME':          str('\'"'+env_vars['MALI_RELEASE_NAME']+'"\''),
+		'MALI_PLATFORM_CONFIG':       '${platform_config}',
+		'MALI_COVERAGE':              '${coverage}',
+		'MALI_CUSTOMER_RELEASE':      '${release}',
+		'MALI_CL_TRACK_OBJECTS':      '${cl_qa}',
+		'MALI_CL_EXPERIMENTAL':       '${cl_experimental}',
+		'MALI_WINSYS_DMA_BUF':        '${winsys_dma_buf}',
+		'MALI_X11_ASYNC_PAGEFLIP':    '${x11_async_pageflip}',
+		'MALI_USE_NEON':              '${simd}',
+		'MALI_CFRAME_FORCE_FRAGMENT_ORDER': '${force_fragment_order}',
+		'MALI_CYCLE_COUNTER':         '${cycle_counter}',
+		'MALI_CFRAME_TLS_CORE_NUM':   '${tls_core_num}',
+		'MALI_MODEL':                 '${mali_model}',
+		'MALI_AFBC':                  '${afbc}',
+		'MALI_DRM_TEST_INTERACTIVE':  '${drm_test_interactive}',
+# MStar defines
+		'MSTAR_PLATFORM':             '${mstar_platform}',
+		'MSTAR_UMP_IMPORT_PA':        '${ump_pa}',
+}
+
+if( get_build_os() == 'linux' ):
+	cpp_defines['MALI_VALGRIND'] = '${valgrind}'
+else:
+	cpp_defines['MALI_VALGRIND'] = '0'
+
+# Create a construction environment for cross-compiled code
+crossenv = Environment( ENV = env_vars, variables=vars, CPPDEFINES=cpp_defines )
+
+# Set filtering options
+import imp
+try:
+	imp.find_module('mali_include')
+	from mali_include import set_mali_include
+	set_mali_include(crossenv)
+except:
+	pass
+
+# MStar default options
+if crossenv['mstar'] == '1':
+	crossenv['CPPDEFINES']['MSTAR'] = '1'
+
+	crossenv['platform_config'] = 'mstar'
+	crossenv['ump_monolithic'] = '1'
+
+	# os
+	if crossenv['os'] == 'android':
+		crossenv['gralloc'] = '0'
+		crossenv['fixed_device_id'] = '0'
+	else:
+		crossenv['progs_install'] = 'bin'
+		crossenv['libs_install'] = 'bin'
+		# use the same toolchain for both kernel and user drivers
+		if crossenv['toolchain_prefix_target'] != '':
+			crossenv['ENV']['CROSS_COMPILE']=crossenv['toolchain_prefix_target']
+
+	# winsys
+	if crossenv['winsys'] == 'directfb':
+		crossenv['directfb'] = '1'
+	elif crossenv['winsys'] == 'wayland':
+		crossenv['wayland'] = '1'
+	elif crossenv['winsys'] == 'gm':
+		crossenv['gm'] = '1'
+
+# Map base_qa options to MALI_BASE_QA CPPDEFINES
+crossenv['CPPDEFINES']['MALI_BASE_QA_LEAK'] = '0'
+crossenv['CPPDEFINES']['MALI_BASE_QA_USE_AFTER_FREE'] = '0'
+crossenv['CPPDEFINES']['MALI_BASE_QA_RESFAIL'] = '0'
+crossenv['CPPDEFINES']['MALI_BASE_QA_INFINITE_CACHE'] = '0'
+for base_qa_option in crossenv['base_qa']:
+	if base_qa_option == 'leak':
+		crossenv['CPPDEFINES']['MALI_BASE_QA_LEAK'] = '1'
+	if base_qa_option == 'use-after-free':
+		crossenv['CPPDEFINES']['MALI_BASE_QA_USE_AFTER_FREE'] = '1'
+	if base_qa_option == 'resfail':
+		crossenv['CPPDEFINES']['MALI_BASE_QA_RESFAIL'] = '1'
+	if base_qa_option == 'infinite-cache':
+		crossenv['CPPDEFINES']['MALI_BASE_QA_INFINITE_CACHE'] = '1'
+
+if( crossenv['debug'] =='1' and get_build_os() != 'osx' ):
+	crossenv['CPPDEFINES']['MALI_UTF_RESFAIL'] = '1'
+else:
+	crossenv['CPPDEFINES']['MALI_UTF_RESFAIL'] = '0'
+
+# Check consistency between the old hw=x option and the new backend/no_mali flags
+defargs = [arg[0] for arg in ARGLIST]
+if 'hw' in defargs and ('backend' in defargs or 'no_mali' in defargs):
+	sys.stderr.write("bldsys error: the hw=x option and backend/no_mali options are exclusive\n")	
+	sys.exit( -1 )
+
+# MIDCOM-3406 We only allow NEON if the target is the GNU toolchain at the moment
+if crossenv['toolchain'] != 'gnu' and crossenv['CPPDEFINES']['MALI_USE_NEON'] != 0:
+	sys.stderr.write("bldsys warning: the simd=1 option is only supported on the GNU Toolchain, disabling SIMD acceleration in this build.")
+	crossenv['CPPDEFINES']['MALI_USE_NEON'] = '0'
+
+if 'hw' in defargs:
+	sys.stderr.write("bldsys warning: the hw=x option is deprecated, please use backend/no_mali instead\n")	
+	if crossenv['hw'] == '0':
+		crossenv['backend'] = 'user'
+		crossenv['no_mali'] = '1'
+	elif crossenv['hw'] == '1':
+		crossenv['backend'] = 'user'
+		crossenv['no_mali'] = '0'
+	elif crossenv['hw'] == '2':
+		crossenv['backend'] = 'kernel'
+		crossenv['no_mali'] = '0'
+
+
+# Choose default platform 
+if crossenv['platform_config'] == 'gpu_default':
+	if crossenv['gpu'] == 't76x':
+		crossenv['platform_config'] = 'vexpress_virtex7_40mhz'
+	else:
+		crossenv['platform_config'] = 'vexpress'
+
+if 'fbd' in defargs and crossenv['fbd'] != 'gpu_default': 
+	if crossenv['fbd'] == 'multiple':
+		if crossenv['gpu'] != 't76x':
+			sys.stderr.write("Using fbd=multiple is currently not supported other than on gpu=t76x hw\n")
+			sys.exit( -1 )
+		crossenv['CPPDEFINES']['MALI_USE_MFBD'] = '1'
+		crossenv['CPPDEFINES']['MALI_USE_SPMRT'] = '0'
+	else:
+		crossenv['CPPDEFINES']['MALI_USE_MFBD'] = '0'
+		crossenv['CPPDEFINES']['MALI_USE_SPMRT'] = '1'
+else:
+	# pick default setting for fbd based on gpu
+	if crossenv['gpu'] == 't76x':
+		crossenv['CPPDEFINES']['MALI_USE_MFBD'] = '1' 
+		crossenv['fbd'] = 'multiple'
+		crossenv['CPPDEFINES']['MALI_USE_SPMRT'] = '0'
+	else:
+		crossenv['CPPDEFINES']['MALI_USE_MFBD'] = '0' 
+		crossenv['fbd'] = 'single'
+		crossenv['CPPDEFINES']['MALI_USE_SPMRT'] = '1'
+
+if 'dummy_model' in defargs:
+	sys.stderr.write("bldsys warning: the dummy_model option is deprecated, please use no_mali instead\n")
+	crossenv['no_mali'] = '1'
+
+# Prompt users that the ee option is deprecated.
+if int(crossenv['ee']) != 0:
+	sys.stderr.write("bldsys warning: ee option is deprecated, setting dump=1\n")
+	crossenv['dump'] = '1'
+
+# Prompt users that the no_syncsets option is obsolete.
+if int(crossenv['no_syncsets']) != 0:
+	sys.stderr.write("bldsys warning: no_syncsets option is obsolete and ignored by the build tools\n")
+
+# Document deprecated Android versions
+deprecated_versions = ['jbmr1', 'jbmr1.1']
+if crossenv['os'] == 'android' and (crossenv['android_version'] in deprecated_versions):
+	sys.stderr.write("This version of Android is no longer supported\n");
+
+# Workaround issue of .cpp files including headers which have inlines that need some extra macros
+if crossenv['os'] == 'android':
+	crossenv['CPPDEFINES']['__STDC_LIMIT_MACROS'] = '1'
+
+# Set base backend
+if crossenv['backend'] == 'kernel':
+	crossenv['CPPDEFINES']['MALI_BACKEND_KERNEL'] = '1'
+else:
+	crossenv['CPPDEFINES']['MALI_BACKEND_KERNEL'] = '0' 
+	build_targets = map(str, BUILD_TARGETS)
+	if not(('mali_clcc' in build_targets) or ('malisc' in build_targets)):
+		# User space backend can only be run on x86 with a mali model.
+		# However, if we're building either of the offline compilers, don't force the model.
+		crossenv['CPPDEFINES']['MALI_MODEL'] = '1'
+
+# set hwver to pick up correct headers
+if crossenv['CPPDEFINES']['MALI_MODEL'] == '1':
+	crossenv['hwver'] = 'none'
+
+# Set 'no_mali' default for base backend if requested ('no_mali' == '2')
+#
+# Default for backend=user   -> no_mali=1 (use dummy model)
+# Default for backend=kernel -> no_mali=0 (do not use dummy model)
+#
+if crossenv['no_mali'] == '2':
+	if crossenv['backend'] == 'user':
+		crossenv['no_mali'] = '1'
+	else:
+		crossenv['no_mali'] = '0'
+	
+# GPL only available with kernel backend
+if (crossenv['backend'] != 'kernel'):
+	crossenv['mali_license_is_gpl'] = '0'
+
+crossenv['mali_release_name'] = str(env_vars['MALI_RELEASE_NAME'])
+
+# Define the hardware version used by the UTF and GLES build - also check for valid gpu and hwver combination
+valid_gpu_hwver_combination = True;
+if (crossenv['gpu'] == 't60x'):
+	crossenv['CPPDEFINES']['MALI_PRODUCT_ID_T60X'] = '1'
+	crossenv['CPPDEFINES']['MALI_GLES_PRODUCT_ID'] = 'GLES_MIDG_PRODUCT_ID_MALI_T60X'
+	crossenv['CPPDEFINES']['MALI_CINSTR_HW'] = 'CINSTR_HW_T60X'
+	crossenv['CPPDEFINES']['MALI_UKU_DDK_BUILD_PRODUCT_ID'] = 'UKU_DDK_BUILD_MALI_PRODUCT_T60X'
+	if( crossenv['hwver'] == 'r0p0' ):
+		utf_ef = 'MALI_UTF_EF_T60X_R0P0_15DEV0'
+	elif( crossenv['hwver'] == 'r0p0_eac' or crossenv['hwver'] == 'none' ):
+		utf_ef = 'MALI_UTF_EF_T60X_R0P0'
+	elif( crossenv['hwver'] == 'r0p1' ):
+		utf_ef = 'MALI_UTF_EF_T60X_R0P1'
+	else:
+		valid_gpu_hwver_combination = False
+elif (crossenv['gpu'] == 't62x'):
+	crossenv['CPPDEFINES']['MALI_PRODUCT_ID_T62X'] = '1'
+	crossenv['CPPDEFINES']['MALI_GLES_PRODUCT_ID'] = 'GLES_MIDG_PRODUCT_ID_MALI_T62X'
+	crossenv['CPPDEFINES']['MALI_CINSTR_HW'] = 'CINSTR_HW_T62X'
+	crossenv['CPPDEFINES']['MALI_UKU_DDK_BUILD_PRODUCT_ID'] = 'UKU_DDK_BUILD_MALI_PRODUCT_T62X'
+	if( crossenv['hwver'] == 'r0p1' ):
+		utf_ef = 'MALI_UTF_EF_T62X_R0P1'
+	elif( crossenv['hwver'] == 'r1p0' or crossenv['hwver'] == 'none' ):
+		utf_ef = 'MALI_UTF_EF_T62X_R1P0'
+	else:
+		valid_gpu_hwver_combination = False
+elif (crossenv['gpu'] == 't67x'):
+	crossenv['CPPDEFINES']['MALI_PRODUCT_ID_T67X'] = '1'
+	crossenv['CPPDEFINES']['MALI_GLES_PRODUCT_ID'] = 'GLES_MIDG_PRODUCT_ID_MALI_T67X'
+	crossenv['CPPDEFINES']['MALI_CINSTR_HW'] = 'CINSTR_HW_T67X'
+	crossenv['CPPDEFINES']['MALI_UKU_DDK_BUILD_PRODUCT_ID'] = 'UKU_DDK_BUILD_MALI_PRODUCT_T67X'
+	if( crossenv['hwver'] == 'r1p0' or crossenv['hwver'] == 'none'):
+		utf_ef = 'MALI_UTF_EF_T67X_R1P0'
+	else:
+		valid_gpu_hwver_combination = False
+elif (crossenv['gpu'] == 't76x'):
+	crossenv['CPPDEFINES']['MALI_PRODUCT_ID_T76X'] = '1'
+	crossenv['CPPDEFINES']['MALI_GLES_PRODUCT_ID'] = 'GLES_MIDG_PRODUCT_ID_MALI_T76X'
+	crossenv['CPPDEFINES']['MALI_CINSTR_HW'] = 'CINSTR_HW_T76X'
+	crossenv['CPPDEFINES']['MALI_UKU_DDK_BUILD_PRODUCT_ID'] = 'UKU_DDK_BUILD_MALI_PRODUCT_T76X'
+	if( crossenv['hwver'] == 'r0p0_beta' ):
+		utf_ef = 'MALI_UTF_EF_T76X_R0P0_BETA'
+	elif( crossenv['hwver'] == 'r0p0' or crossenv['hwver'] == 'none' ):
+		utf_ef = 'MALI_UTF_EF_T76X_R0P0'
+	elif( crossenv['hwver'] == 'r0p1'):
+		utf_ef = 'MALI_UTF_EF_T76X_R0P1'
+	elif( crossenv['hwver'] == 'r0p2'):
+		utf_ef = 'MALI_UTF_EF_T76X_R0P2'
+	elif( crossenv['hwver'] == 'r1p0'):
+		utf_ef = 'MALI_UTF_EF_T76X_R1P0'
+	else:
+		valid_gpu_hwver_combination = False
+elif (crossenv['gpu'] == 't72x'):
+	crossenv['CPPDEFINES']['MALI_PRODUCT_ID_T72X'] = '1'
+	crossenv['CPPDEFINES']['MALI_GLES_PRODUCT_ID'] = 'GLES_MIDG_PRODUCT_ID_MALI_T72X'
+	crossenv['CPPDEFINES']['MALI_CINSTR_HW'] = 'CINSTR_HW_T72X'
+	crossenv['CPPDEFINES']['MALI_UKU_DDK_BUILD_PRODUCT_ID'] = 'UKU_DDK_BUILD_MALI_PRODUCT_T72X'
+	if( crossenv['hwver'] == 'r0p0' or crossenv['hwver'] == 'none' ):
+		utf_ef = 'MALI_UTF_EF_T72X_R0P0'
+	elif( crossenv['hwver'] == 'r1p0'):
+		utf_ef = 'MALI_UTF_EF_T72X_R1P0'
+	else:
+		valid_gpu_hwver_combination = False
+
+if not valid_gpu_hwver_combination:
+	sys.stderr.write("bldsys error: compiling with unsupported GPU product id ('%s') and hwver ('%s') combination\n" % (crossenv['gpu'], crossenv['hwver']))
+	sys.exit( -1 )
+
+if( crossenv['no_mali'] == '1' ):
+	crossenv['CPPDEFINES']['MALI_UTF_HW_REV'] =  'MALI_UTF_EF_DUMMY_MODEL'
+elif( crossenv['backend'] == 'user' ):
+	crossenv['CPPDEFINES']['MALI_UTF_HW_REV'] =  'MALI_UTF_EF_MODEL'
+elif( crossenv['backend'] == 'kernel' ):
+	crossenv['CPPDEFINES']['MALI_UTF_HW_REV'] = utf_ef
+else:
+	sys.stderr.write("bldsys error: compiling with unknown backend [%s]\n" % crossenv['backend'])
+	sys.exit( -1 )
+
+crossenv['CPPDEFINES']['MALI_ANDROID_VERSION_FUTURE'] = '0'
+crossenv['CPPDEFINES']['MALI_ANDROID_VERSION_JBMR2'] = '0'
+crossenv['CPPDEFINES']['MALI_ANDROID_VERSION_JBMR1'] = '0'
+
+if( crossenv['android_version'] == 'jbmr1' or crossenv['android_version'] == 'jbmr1.1' ):
+	crossenv['CPPDEFINES']['MALI_ANDROID_VERSION_JBMR1'] = '1'
+elif( crossenv['android_version'] == 'jbmr2' ):
+	crossenv['CPPDEFINES']['MALI_ANDROID_VERSION_JBMR2'] = '1'
+	crossenv['CPPDEFINES']['MALI_ANDROID_VERSION_JBMR1'] = '1'
+elif( crossenv['android_version'] == 'future' ):
+	crossenv['CPPDEFINES']['MALI_ANDROID_VERSION_FUTURE'] = '1'
+	crossenv['CPPDEFINES']['MALI_ANDROID_VERSION_JBMR2'] = '1'
+	crossenv['CPPDEFINES']['MALI_ANDROID_VERSION_JBMR1'] = '1'
+
+crossenv['CPPDEFINES']['MALI_ANDROID_EXYNOS_GRALLOC'] = '0'
+if 'exynos' in crossenv['android_gralloc_path']:
+	crossenv['CPPDEFINES']['MALI_ANDROID_EXYNOS_GRALLOC'] = '1'
+
+# big.Little migration defines
+crossenv['CPPDEFINES']['MALI_BL_NONE'] = '0'
+crossenv['CPPDEFINES']['MALI_BL_CS']   = '0'
+crossenv['CPPDEFINES']['MALI_BL_HMP']  = '0'
+
+if( not crossenv['bl'] or crossenv['bl'] == 'none' ):
+	crossenv['CPPDEFINES']['MALI_BL_NONE'] = '1'
+elif( crossenv['bl'] == 'cs' ):
+	crossenv['CPPDEFINES']['MALI_BL_CS'] = '1'
+elif( crossenv['bl'] == 'hmp' ):
+	crossenv['CPPDEFINES']['MALI_BL_HMP'] = '1'
+
+# Hard-coded values for variables set by obsolete command-line options - these
+# can be removed entirely once all build files no longer refer to them.
+crossenv['doc'] = 0
+crossenv['platform'] = 'dummy'
+
+# Trap any unrecognized command-line options
+unknown = vars.UnknownVariables()
+if unknown:
+	sys.stderr.write("*** Unknown command line option(s):%s\n" % unknown.keys())
+	Exit(1)
+
+# Warn on deprecated build options for GLES differentiation
+if crossenv['gles1'] == '1' or crossenv['gles2'] == '1':
+        sys.stderr.write("bldsys warning: 'Usage of the 'gles1=' and/or 'gles2=' build option is deprecated, use 'gles=' instead. Treating as gles=1 for now.\n")
+        crossenv['gles'] = '1'
+        crossenv['CPPDEFINES']['MALI_USE_GLES'] = '1'
+if crossenv['gles1'] == '0' and crossenv['gles2'] == '0' and crossenv['gles'] == '1':
+        sys.stderr.write("bldsys warning: 'Usage of the 'gles1=' and/or 'gles2=' build option is deprecated, use 'gles=' instead. Treating as gles=0 for now.\n")
+        crossenv['gles'] = '0'
+        crossenv['CPPDEFINES']['MALI_USE_GLES'] = '0'
+# Rebuild the dictionary - remove deprecated entries.
+crossenv._dict = dict((key, value) for (key, value) in crossenv._dict.items() if (key != 'gles1' and key != 'gles2'))
+
+# If GLES was disabled, disable gles_experimental too
+if crossenv['gles'] == '0' and crossenv['gles_experimental'] == '1':
+        sys.stderr.write("bldsys warning: 'gles_experimental=1' requires 'gles=1', enforcing gles_experimental=0.\n")
+        crossenv['gles_experimental'] = '0'
+        crossenv['CPPDEFINES']['MALI_GLES_EXPERIMENTAL'] = '0'
+
+# Trap some incompatible options
+if crossenv['unit'] == '1' and crossenv['debug'] == '0':
+	sys.stderr.write("*** 'unit=1' and 'debug=0' are an unsupported pair of options.\n")
+	sys.stderr.write("    unit tests depend on debug features for proper operation.\n")
+	Exit(1)
+
+if crossenv['winsys'] == 'x11' and crossenv['arch'].find('arm') == -1 :
+	sys.stderr.write("*** 'winsys=x11' and 'arch=%s' are an unsupported pair of options.\n" % crossenv['arch'])
+	sys.stderr.write("    X11 is only supported on ARM.\n")
+	Exit(1)
+
+if crossenv['unit'] == '1' and crossenv['release'] == '1':
+	sys.stderr.write("*** 'unit=1' and 'release=1' are an unsupported pair of options.\n")
+	sys.stderr.write("    'unit=1' implies that internal (non-customer) unit tests are built\n")
+	sys.stderr.write("    and 'release=1' implies that the build is intended for a customer\n")
+
+Help( "Available DDK build options:\n")
+Help( vars.GenerateHelpText(crossenv, True) )
+
+# #include path is the build-root
+#
+rSrcDir = os.getcwd()
+crossenv.Append( CPPPATH=[rSrcDir] )
+
+
+# Create a new builder that compiles to position-independent code; then make this
+# the default builder for all Library and StaticLibrary builds.
+#
+picLibBuilder = SCons.Builder.Builder(action = SCons.Action.Action('$ARCOM', '$ARCOMSTR'),
+					emitter = static_library_emitter_method,
+					prefix = '$LIBPREFIX',
+					suffix = '$LIBSUFFIX',
+					src_suffix = '$OBJSUFFIX',
+					src_builder = 'SharedObject')
+crossenv['BUILDERS']['StaticLibrary'] = picLibBuilder
+crossenv['BUILDERS']['Library']       = picLibBuilder
+
+# Create a new default shared library builder
+sharedLibBuilder = SCons.Builder.Builder(action = SCons.Action.Action('$SHLINKCOM', '$SHLINKCOMSTR'),
+					emitter = shared_library_emitter_method,
+					prefix = '$SHLIBPREFIX',
+					suffix = '$SHLIBSUFFIX',
+					src_suffix = '$SHOBJSUFFIX',
+					src_builder = 'SharedObject',
+					target_scanner = ProgramScanner)
+crossenv['BUILDERS']['SharedLibrary'] = sharedLibBuilder
+
+# Create a new default Program builder
+ProgramBuilder = SCons.Builder.Builder(action = SCons.Defaults.LinkAction,
+					emitter = program_build_emitter,
+					prefix = '$PROGPREFIX',
+					suffix = '$PROGSUFFIX',
+					src_suffix = '$OBJSUFFIX',
+					src_builder = 'Object',
+					target_scanner = ProgramScanner)
+crossenv['BUILDERS']['Program'] = ProgramBuilder
+
+# Supply our own shared and static library emitters.
+for prefix in ['s', 'c','C','cpp','CPP','m']:
+	crossenv['BUILDERS']['SharedObject'].add_emitter( '.%s' % prefix, shared_object_emitter_method )
+	crossenv['BUILDERS']['StaticObject'].add_emitter( '.%s' % prefix, static_object_emitter_method )
+
+if crossenv.has_key('progs_install'):
+	# install programs into absolute path
+	crossenv['progs_install'] = os.path.abspath( crossenv['progs_install'] )
+
+if crossenv.has_key('libs_install'):
+	# install libraries into absolute path
+	crossenv['libs_install'] = os.path.abspath( crossenv['libs_install'] )
+
+# Suppress output from the tools if verbose output isn't enabled (v=1)
+if crossenv['v'] != '1':
+	crossenv['CXXCOMSTR'] = "[CPP] $SOURCE"
+	crossenv['SHCXXCOMSTR'] = "[CPP] $SOURCE"
+	crossenv['CCCOMSTR'] = "[CC] $SOURCE"
+	crossenv['SHCCCOMSTR'] = "[CC] $SOURCE"
+	crossenv['LINKCOMSTR'] = "[LINK] $TARGET"
+	crossenv['SHLINKCOMSTR'] = "[SHLINK] $TARGET"
+	crossenv['ARCOMSTR'] = "[AR] $TARGET"
+	crossenv['RANLIBCOMSTR'] = "[RANLIB] $TARGET"
+	crossenv['INSTALLSTR'] = "[INSTALL] $TARGET"
+
+# Add helpers to the environment that support library and program target aliases
+crossenv.AddMethod(lib_target, 'LibTarget')
+crossenv.AddMethod(prog_target, 'ProgTarget')
+
+# Add helper to expand lists
+crossenv.AddMethod(expand_list, "ExpandList")
+
+# Added for ccache .  We want to ensure this UMASK is set otherwise one person that forgets it
+# can litter the cache with files that can't be read by anyone else.
+if crossenv['ccache'] == '1':
+  crossenv['ENV']['CCACHE_UMASK']='002'
+  crossenv['ENV']['CCACHE_TEMPDIR']='/tmp'
+
+# Mocking is only available when building unit tests.
+if crossenv['unit'] == '1':
+	if os.path.exists(os.path.join( "bldsys", "cmock_utils.py" )):
+		# Import functions from CMock utility file
+		from cmock_utils import cmock_utils_init, generate_mocked_module_libraries, generate_mocked_header_objects, get_cmock_object
+		# Add CMock helpers to the environment
+		crossenv.AddMethod(generate_mocked_module_libraries, 'GenerateMockedModuleLibraries')
+		crossenv.AddMethod(generate_mocked_header_objects, 'GenerateMockedHeaderObjects')
+		crossenv.AddMethod(get_cmock_object, 'GetCMockObject')
+		# Set flag showing CMock support has been loaded
+		crossenv['CMOCK'] = "1"
+	else:
+		sys.stderr.write("bldsys warning: cmock_utils.py is missing\n")
+		crossenv['CMOCK'] = "0"
+else:
+	crossenv['CMOCK'] = "0"
+
+if crossenv['streamline_annotate'] == '1' and crossenv['gator'] == '0':
+	sys.stderr.write("You must also set gator=1 if you want to use streamline_annotate=1\n")
+	sys.exit( -1 )
+
+if crossenv['streamline_annotate'] == '1':
+	if not os.path.exists(os.path.join( "bldsys", "tools", "streamline", "streamline_annotate.h" )):
+		sys.stderr.write("In order to use streamline annotations you should first create bldsys/tools/streamline "
+		"directory and put streamline_annotate.h file there. The information about where to find that file is here: "
+		"http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0482g/customize_annotate.html\n")
+		sys.exit( -1 )
+
+if (not ARGUMENTS.get('os') and not ARGUMENTS.get('profile')):
+	crossenv['os'] = get_build_os()
+
+if (not ARGUMENTS.get('arch') and not ARGUMENTS.get('profile')):
+	crossenv['arch'] = get_build_platform()
+
+# Use timestamps to determine whether files should be rebuilt, then check MD5 sums, for shorter build times
+crossenv.Decider('MD5-timestamp')
+
+# If cl=1
+if crossenv['cl'] == '1':
+	# If the deprecated 'opencl_devices' build option is used, check if the 'opencl_platform_config' value is the default.
+	if 'opencl_devices' in crossenv:
+		sys.stdout.write("bldsys warning: The opencl_devices= build option has been deprecated, opencl_platform_config= should be used instead.\n")
+
+		# Check if 'opencl_platform_config' was also used
+		if 'opencl_platform_config' in crossenv:
+			sys.stderr.write("bldsys error: 'opencl_devices' has been deprecated, 'opencl_platform_config' should be used in its place and not in addition.\n")	
+			sys.exit( -1 )
+
+		# Try to get a platform configuration that has an equivalent platform and a configuration header
+		opencl_platform_config_exist = False
+		config = None
+		configs = opencl_platform_config_get_opencl_devices_equivalent( crossenv )
+		for conf in configs:
+			opencl_platform_config_exist = os.path.exists(os.path.join( "cl", "src", "platform_configs", "mali_mcl_" + conf + ".h" ))
+			if opencl_platform_config_exist:
+				config = conf
+				break
+
+		if not config:
+			sys.stderr.write("bldsys error: No platform containing exactly the devices in 'opencl_devices' was found. Please check whether there is a platform configuration that contains the platform you need.\n")	
+			sys.stderr.write("bldsys error: Platform configurations are defined in the cl/src/platform_configs/ directory.\n")
+			sys.exit( -1 )
+
+		# Substitute the default platform configuration with the one we think is equuivalent
+		sys.stdout.write("bldsys warning: The '" + config + "' configuration defines a platform that has the same list of devices.\n")
+		sys.stdout.write("bldsys warning: This platform configuration will be used by the build system - however, you should "+
+			"ensure that this matches the exact configuration you intended when specifying the 'opencl_devices' command.\n")
+		sys.stdout.write("bldsys warning: Platform configurations are defined in the cl/src/platform_configs directory.\n")
+		sys.stdout.write("bldsys warning: If this is what you expect you should use the following option : opencl_platform_config=" + config + " to avoid getting this warning.\n")
+		crossenv['opencl_platform_config'] = config
+
+	else:
+		# Set the default OpenCL platform configuration to config_t6xx 
+		if 'opencl_platform_config' not in crossenv:
+			crossenv['opencl_platform_config'] = 'config_t6xx'
+
+		if 'opencl_platform_config' in crossenv:
+			# Check if the selected OpenCL platform configuration is valid and has a configuration header
+			opencl_platform_config_valid = crossenv['opencl_platform_config'] in opencl_platform_config_get_names()
+			opencl_platform_config_exist = os.path.exists(os.path.join( "cl", "src", "platform_configs", "mali_mcl_" + crossenv['opencl_platform_config'] + ".h" ))
+			if not opencl_platform_config_valid or not opencl_platform_config_exist:
+				sys.stderr.write("bldsys error: The platform configuration specified is not valid.\n")
+				sys.exit( -1 )
+
+# Check whether to enable interop extensions
+if crossenv['cl'] == '1' and crossenv['egl'] == '1' and crossenv['opencl_platform_config'] != 'config_arm':
+	crossenv['CPPDEFINES']['MALI_CL_KHR_EGL_IMAGE'] = '1'
+	crossenv['CPPDEFINES']['MALI_CL_KHR_EGL_EVENT'] = '1'
+
+	# Only enable gl interop if gles is enabled
+	if crossenv['gles'] == '1':
+		crossenv['CPPDEFINES']['MALI_CL_KHR_GL_SHARING'] = '1'
+	else:
+		crossenv['CPPDEFINES']['MALI_CL_KHR_GL_SHARING'] = '0'
+
+	# Library dependencies for any interop build are the same
+	crossenv.Append(INTEROP_LIBS='midg gles egl egl_winsys tpi_egl cframe cutils_math cutils_array cutils_hash m'.split())
+	if crossenv['ump'] == '1':
+		crossenv['INTEROP_LIBS'].append( 'ump' )
+	if crossenv['os'] == 'android':
+		crossenv['INTEROP_LIBS'].append( 'sync' )
+
+else:
+	crossenv['CPPDEFINES']['MALI_CL_KHR_EGL_IMAGE'] = '0'
+	crossenv['CPPDEFINES']['MALI_CL_KHR_EGL_EVENT'] = '0'
+	crossenv['CPPDEFINES']['MALI_CL_KHR_GL_SHARING'] = '0'
+	crossenv.Append(INTEROP_LIBS='')
+
+# Duplicate the environment before OS-specific changes to give an environment for host-only builds
+hostenv = crossenv.Clone()
+
+sTargetEnvConfig = TargetEnvironmentConfig()
+sTargetEnvConfig.construct_variant_name(crossenv, supported_options)
+sTargetEnvConfig.add_build_dir_suffix()
+sTargetEnvConfig.update_environment(crossenv, rSrcDir)
+
+sHostEnvConfig = HostEnvironmentConfig()
+
+# Configure the cross-compilation environment for the chosen arch & os - skip if we're just displaying help
+if (not GetOption('help')):
+
+	sTargetEnvConfig.apply_os_settings(crossenv)
+	sTargetEnvConfig.apply_platform_settings(crossenv)
+	sTargetEnvConfig.apply_toolchain_settings(crossenv)
+
+	sHostEnvConfig.apply_os_settings(hostenv)
+	sHostEnvConfig.apply_platform_settings(hostenv)
+	sHostEnvConfig.apply_toolchain_settings(hostenv)
+
+sHostEnvConfig.construct_variant_name(hostenv, supported_options)
+sHostEnvConfig.add_build_dir_suffix()
+
+sHostEnvConfig.update_environment(hostenv, rSrcDir)
+
+if (not GetOption('help')):
+	if os.path.exists(os.path.join( "bldsys", "coverage.py" )):
+		# Import code coverage utility file
+		from coverage import coverage_control
+		# And call it - it can update crossenv & hostenv
+		coverage_control( crossenv, hostenv, rSrcDir )
+
+#
+# Setup for consequent CL builds if needed
+#
+
+opencl_platforms = []
+opencl_memory_plugins = []
+opencl_device_caches = []
+# If cl=1
+if crossenv['cl'] == '1':
+	# Get the list of platforms containing the devices to enable in the selected platform configuration 
+	opencl_platforms = opencl_platform_config_get_platforms( crossenv )
+
+	# Generate a header including the header of the selected OpenCL platform configuration
+	opencl_platform_config_generated_header = os.path.join( "cl", "src", "platform_configs", "platform_config_bldsys_generated.h")
+	try:
+		generated_header = open( opencl_platform_config_generated_header, 'w+')
+		generated_header.write('#include "mali_mcl_' + crossenv['opencl_platform_config'] + '.h"\n')
+		generated_header.close()
+	except:
+		sys.stderr.write("bldsys error: cannot generate the header including the selected OpenCL platform configuration (%s).\n" % opencl_platform_config_generated_header)
+		sys.exit( -1 )
+
+	# Generate a header including the required device plugin headers
+	mali_mcl_plugin_device_generated_header = os.path.join( "cl", "src", "mali_mcl_plugin_device_bldsys_generated.h" )
+	try:
+		generated_header = open( mali_mcl_plugin_device_generated_header, 'w+' )
+		for ocl_devices in opencl_platforms:
+			for i in ocl_devices:
+				# T6XX Core Group 1 shares the T6XX device plugin so does not have its own header file
+				if i != "t6xx_cg1":
+					generated_header.write('#include "mali_mcl_plugin_device_' + i.lower() + '.h"\n')
+		generated_header.close()
+	except:
+		sys.stderr.write("bldsys error: cannot generate the header including the required device plugin headers (%s).\n" % mali_mcl_plugin_device_generated_header)
+		sys.exit( -1 )
+
+	# Get the list of memory plugins
+	opencl_memory_plugins = opencl_platform_config_get_memory_plugins( crossenv )
+
+	# Generate a header including the required memory plugin headers
+	mali_mcl_plugin_memory_generated_header = os.path.join( "cl", "src", "mali_mcl_plugin_memory_bldsys_generated.h" )
+	try:
+		generated_header = open( mali_mcl_plugin_memory_generated_header, 'w+' )
+		for i in opencl_memory_plugins:
+			generated_header.write('#include "mali_mcl_plugin_memory_' + i.lower() + '.h"\n')
+		generated_header.close()
+	except:
+		sys.stderr.write("bldsys error: cannot generate the header including the required memory plugin headers (%s).\n" % mali_mcl_plugin_memory_generated_header)
+		sys.exit( -1 )
+
+	# Get the complete list of caches (excluding HOST) required by the selected configuration
+	opencl_device_caches = opencl_platform_config_get_device_caches( crossenv )
+
+# Note: The host is always the first device in a platform's device array (and is, as such, allocated platform id 0).
+
+global_caches_enumeration           = "MCL_CACHE_GLOBAL_ID_HOST"
+global_enumeration                  = "MCL_DEVICE_GLOBAL_ID_HOST"
+device_list                         = "&mcl_device_host"
+memory_type_enumeration             = "MCL_PLUGIN_MEMORY_TYPE_HOST"
+memory_list                         = "&mcl_memory_host"
+
+crossenv.Append( CPPDEFINES = {'MCL_DEVICE_PLATFORM_ID_HOST' : '0'} )
+
+total_num_devices_in_largest_platform = 0
+total_num_devices_in_all_platforms = 0
+for ocl_devices in opencl_platforms:
+	# Device platform ID 0 is reserved for the host.
+	device_platform_id     = 1
+
+	total_num_devices_in_largest_platform = max(total_num_devices_in_largest_platform, len(ocl_devices))
+        total_num_devices_in_all_platforms += len(ocl_devices)
+
+	for i in ocl_devices:
+		global_enumeration += ",MCL_DEVICE_GLOBAL_ID_" + i.upper()
+		device_list += ",&mcl_device_" + i.lower()
+		crossenv.Append( CPPDEFINES = {'MCL_DEVICE_' + i.upper() + '_ENABLE' : '1'} )
+
+		# Platform device IDs cannot be stored in an enumerated type, as a separate enumeration would exist for
+		# each platform, and the device must store its platform ID in some plaform-agnostic way. As such, each
+		# platform ID is declared as a separate constant. The device platform IDs are numbered sequentially for 
+		# each platform.
+		crossenv.Append( CPPDEFINES = {'MCL_DEVICE_PLATFORM_ID_' + i.upper() : str(device_platform_id)} )
+		device_platform_id += 1
+
+for i in opencl_memory_plugins:
+	memory_type_enumeration += ",MCL_PLUGIN_MEMORY_TYPE_" + i.upper()
+	memory_list += ",&mcl_memory_" + i.lower()
+
+for i in opencl_device_caches:
+	global_caches_enumeration += ",MCL_CACHE_GLOBAL_ID_" + i.upper()
+
+total_num_devices_in_largest_platform = str(total_num_devices_in_largest_platform+1) # this count includes the host
+total_num_devices_in_all_platforms = str(total_num_devices_in_all_platforms+1) # this count includes the host
+
+crossenv.Append( CPPDEFINES = {'MCL_GLOBAL_CACHES_ID_ENUMERATION_BLDSYS_GENERATED' : "'" + global_caches_enumeration + "'"} )
+crossenv.Append( CPPDEFINES = {'MCL_GLOBAL_DEVICE_ID_ENUMERATION_BLDSYS_GENERATED' : "'" + global_enumeration + "'"} )
+crossenv.Append( CPPDEFINES = {'MCL_GLOBAL_DEVICE_LIST_BLDSYS_GENERATED' : "'" + device_list + "'"} )
+crossenv.Append( CPPDEFINES = {'MCL_NUM_DEVICES_IN_LARGEST_PLATFORM_BLDSYS_GENERATED' : total_num_devices_in_largest_platform} )
+crossenv.Append( CPPDEFINES = {'MCL_NUM_DEVICES_IN_ALL_PLATFORMS_BLDSYS_GENERATED' : total_num_devices_in_all_platforms} )
+crossenv.Append( CPPDEFINES = {'MCL_MEMORY_TYPE_ENUMERATION_BLDSYS_GENERATED' : "'" + memory_type_enumeration + "'"} )
+crossenv.Append( CPPDEFINES = {'MCL_MEMORY_PLUGIN_LIST_BLDSYS_GENERATED' : "'" + memory_list + "'"} )
+
+#
+# Determine which subdirectories contain SConscript files.
+# The sorting is to ensure that everybody is running things in the same order
+# regardless of how their filesystem chose to order subdirectories.
+#
+scons_scripts = []
+# Form a list of paths to search, in the form <path>/sconscript. A path will be formed for each
+# entry in the current working directory, so some of these will not be valid. For example, if a
+# regular file foo.txt exists, the path "foo.txt/sconscript" will be formed, which is invalid.
+search_paths = [ os.path.join( path, 'sconscript' ) for path in sorted(os.listdir( os.getcwd() )) ]
+
+for p in search_paths:
+	if os.path.exists(p):
+		# Path exists add it to the list of SConscripts
+		scons_scripts.append( p )
+
+		# Add platform_XYZ directory to include path, so that '#include <plat/foo.h>' works
+		# For each directory that we have added to the lists of sconscripts above, form a
+		# platform dir name "<dir>/platform_<platform>". We then check that the directory
+		# actually lists; if it does, we add it to CPPPATH for the environment.
+		plat_dir_name = os.path.join( os.path.dirname(p), 'platform_%s' % crossenv['platform'] )
+		if os.path.isdir(plat_dir_name):
+			plat_dir = [ Dir(plat_dir_name) ]
+			crossenv.Append( CPPPATH=plat_dir )
+
+if crossenv['backend'] == 'kernel':
+	kbase_dir_name = os.path.join('kernel/drivers/gpu/arm/midgard', 'platform_%s' % crossenv['platform'] )
+else:
+	kbase_dir_name = os.path.join('user/midgard', 'platform_%s' % crossenv['platform'] )
+
+if os.path.isdir(kbase_dir_name):
+	crossenv.Append ( CPPPATH=[ Dir(kbase_dir_name) ] )
+
+# Add the directory used to hold hardware-revision specific defintions to the include path
+hwver_dir_name = os.path.join('base', 'midg_gpus', '%s' % crossenv['gpu'], '%s' % crossenv['hwver'] )
+
+crossenv.Append ( CPPPATH=[ Dir(hwver_dir_name) ] )
+
+# Make sure modules that set environment variables used by the modules come first.
+# The order in this list is reversed so last one in the list becomes the first module to be processed
+for mod in ['cmem','cdbg','cobj','cmpbe','clcc','osu','kbase','kernel','user','base','utf','tpi','khronos','cctx','cinstr']:
+	if (os.path.join('%s','sconscript') % mod in scons_scripts):
+		scons_scripts.remove( os.path.join('%s','sconscript') % mod )
+		scons_scripts.insert( 0, os.path.join('%s','sconscript') % mod )
+
+if crossenv['CMOCK'] == "1":
+	# Initialise cmock support utils
+	if not cmock_utils_init( crossenv ):
+		# Failed to initialse - clear CMock available flag
+		crossenv['CMOCK'] = "0"
+
+if crossenv['backend'] == "user":
+	if (crossenv['gpu'] == 't76x'):
+		crossenv['model_product_name'] = 't76x'
+	elif (crossenv['gpu'] == 't72x'):
+		crossenv['model_product_name'] = 't72x'
+	else:
+		crossenv['model_product_name'] = 't6xx'
+	# Ensure that we extract the model's header files before we start a build
+	if os.path.exists(os.path.abspath("model/model_%s.tgz" % crossenv['model_product_name'])):
+		Execute ('@tar xzf model/model_%s.tgz -C model --strip-components 2 Rexported/include' % crossenv['model_product_name'])
+
+
+if crossenv['winsys'] == 'x11':
+	crossenv.Append( CPPPATH = ['#x11/thirdparty/include'] )
+
+if crossenv['backend'] == 'kernel':
+	# For ump and midgard header files
+	crossenv.Append( CPPPATH = ['#kernel/drivers/gpu/arm'] )
+	crossenv.Append( CPPPATH = ['#kernel/include'] )
+else:
+	crossenv.Append( CPPPATH = ['#user'] )
+	# For ump and midgard header files
+	crossenv.Append( CPPPATH = ['#user/include'] )
+
+env=crossenv
+
+Export( 'env', 'hostenv' )
+
+# Perform the build actions described in each SConscript
+for s in scons_scripts:
+	SConscript( s, variant_dir=os.path.join( env['BUILD_DIR_PATH'], os.path.dirname(s) ), duplicate=0 )
+
+# NOTE: Monolithic build system currently only tested on linux & android
+if env['os'] == 'linux' or env['os'] == 'android':
+	# All the sconscripts have been run. Make any alterations to the object/libraries/programs before SCons
+	# works out the dependencies, the build order and does any building. This function also declares the
+	# builder for the shared mali library.
+	post_script_processing( env )
+
+#
+#print "\n=====================\nTARGET ENVIRONMENT\n"
+#print(crossenv.Dump())
+#print "\n=====================\nHOST ENVIRONMENT\n"
+#print(hostenv.Dump())
+#print "\n=====================\n"
+
+#list_declared_objects( env )
+#list_declared_libs(env )

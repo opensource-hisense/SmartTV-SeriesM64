@@ -1,0 +1,166 @@
+# This confidential and proprietary software may be used only as
+# authorised by a licensing agreement from ARM Limited
+# (C) COPYRIGHT 2010-2013 ARM Limited
+# ALL RIGHTS RESERVED
+# The entire notice above must be reproduced on all authorised
+# copies and copies may only be made to the extent permitted
+# by a licensing agreement from ARM Limited.
+
+Import( 'env' )
+
+# kernel_get_config_defines maps the scons build variables to their 
+# kconfig equivalent. Only the ones supported in the Kconfig files
+# are mapped. It returns an assignment of SCONS_CFLAGS and SCONS_CONFIGS
+# which can be used on the make command line. The fake argument
+# needs to be set to 1 generate the configs/defines for the fake
+# platform configuration.
+#
+# It is meant to support the way we call into the kernel build system
+# through scons:
+#
+#   * sconscript calling make with SCONS_CFLAGS and SCONS_CONFIGS on
+#     the commandline:
+#          makeAction=Action("cd ${SOURCE.dir}/.. &&
+#                             make %s" % env.kernel_get_config_defines())
+#   * the makefile itself calls make again to build the module/test with
+#     the kernel build system. It passes $(SCONS_CONFIGS) on the command
+#     line so that the CONFIG_ variables become available in the
+#     Kbuild/Makefile:
+#          $(MAKE) -C $(KDIR) M=$(CURDIR) $(SCONS_CONFIGS)
+#   * the Kbuild/Makefile accesses the CONFIG_ variables as makefile
+#     variables and makes the CONFIG_ variables available as pre-processor
+#     macros by passing $(SCONS_CFLAGS) to EXTRA_CFLAGS.
+# 
+def kernel_get_config_defines(self, fake=0):
+	defines = 'SCONS_CFLAGS="'
+
+	# Set filtering options
+	import imp
+	try:
+		imp.find_module('mali_include')
+		from mali_include import get_mali_include
+		defines += get_mali_include(env)
+	except:
+		pass
+
+	# GCC 4.7 on AOSP 4.3 contains a defect which didn't allow us to use the "_Pragma" syntax, where an error message 
+	# is returned:   
+	#
+	# "internal compiler error: unspellable token PRAGMA"  
+	# 
+	# This regression has thus far only been seen on the GCC 4.7 compiler bundled with AOSP 4.3.0.  GCC 4.7 
+	# issue tracked at MIDCOM-4598.  
+	# 
+	# The workaround entails: 
+	# - Overriding the global Android GCC 'Werror=address' flag, by adding the GCC flag 'Wno-address' to 
+	#   local C flags in the Android makefile for the DDK, as is done below.  
+	# - Conditionally compiled use of "_Pragma("..."), so it is _not_ compiled if the workaround is active.  
+	# 
+	# The C code workarounds have a GCC version range bigger than just v4.7, because of a pre-existing workaround, 
+	# presumably to a similar defect.  
+	dWorkaround = env['CPPDEFINES']
+	defines += '-DMALI_GCC_WORKAROUND_MIDCOM_4598=%s ' % dWorkaround['MALI_GCC_WORKAROUND_MIDCOM_4598']
+	if env['os'] != 'android':
+		defines += '-DCONFIG_KDS '
+		configs = 'SCONS_CONFIGS=" CONFIG_KDS=m CONFIG_MALI_MIDGARD=m '
+	else:
+		# android
+		configs = 'SCONS_CONFIGS=" CONFIG_MALI_MIDGARD=m '
+
+	for base_qa_option in self['base_qa']:
+		if base_qa_option == 'leak':
+			defines += '-DCONFIG_MALI_QA_LEAK '
+			configs += 'CONFIG_MALI_QA_LEAK=y '
+		if base_qa_option == 'resfail':
+			defines += '-DCONFIG_MALI_QA_RESFAIL '
+			configs += 'CONFIG_MALI_QA_RESFAIL=y '
+	if env['debug'] == '1':
+		defines += '-DCONFIG_MALI_DEBUG '
+		configs += 'CONFIG_MALI_DEBUG=y '
+	if env['ump'] == '1':
+		defines += '-DCONFIG_UMP '
+		configs += 'CONFIG_UMP=y '
+	if env['gator'] == '1':
+		defines += '-DCONFIG_MALI_GATOR_SUPPORT '
+		configs += 'CONFIG_MALI_GATOR_SUPPORT=y '
+	if env['no_mali'] == '1':
+		defines += '-DCONFIG_MALI_NO_MALI '
+		configs += 'CONFIG_MALI_NO_MALI=y '
+		if env['gpu'] == 't76x':
+			defines += '-DCONFIG_MALI_PRODUCT_ID_T76X=y '
+			configs += 'CONFIG_MALI_PRODUCT_ID_T76X=y '
+	if env['error_inject'] == '1':
+		defines += '-DCONFIG_MALI_ERROR_INJECTION '
+		configs += 'CONFIG_MALI_ERROR_INJECTION=y '
+	if fake:
+		defines += '-DCONFIG_MALI_PLATFORM_FAKE '
+		configs += 'CONFIG_MALI_PLATFORM_FAKE=y '
+
+		if env['platform_config'] == 'vexpress':
+			defines += '-DCONFIG_MALI_PLATFORM_VEXPRESS '
+			configs += 'CONFIG_MALI_PLATFORM_VEXPRESS=y '
+		elif env['platform_config'] == 'rtsm_ve':
+			defines += '-DCONFIG_MALI_PLATFORM_RTSM_VE '
+			configs += 'CONFIG_MALI_PLATFORM_RTSM_VE=y '
+		elif env['platform_config'] == 'juno':
+			defines += '-DCONFIG_MALI_PLATFORM_JUNO '
+			configs += 'CONFIG_MALI_PLATFORM_JUNO=y '
+		elif env['platform_config'] == 'vexpress_virtex7_40mhz':
+			defines += '-DCONFIG_MALI_PLATFORM_VEXPRESS_VIRTEX7_40MHZ '
+			configs += 'CONFIG_MALI_PLATFORM_VEXPRESS_VIRTEX7_40MHZ=y '
+		elif env['platform_config'] == 'vexpress_6xvirtex7_10mhz':
+			defines += '-DCONFIG_MALI_PLATFORM_VEXPRESS_6XVIRTEX7_10MHZ '
+			configs += 'CONFIG_MALI_PLATFORM_VEXPRESS_6XVIRTEX7_10MHZ=y '
+		elif env['platform_config'] == 'goldfish':
+			defines += '-DCONFIG_MALI_PLATFORM_GOLDFISH '
+			configs += 'CONFIG_MALI_PLATFORM_GOLDFISH=y '
+		elif env['platform_config'] == 'pbx':
+			defines += '-DCONFIG_MALI_PLATFORM_PBX '
+			configs += 'CONFIG_MALI_PLATFORM_PBX=y '
+		elif env['platform_config'] == 'pandaboard':
+			defines += '-DCONFIG_MALI_PLATFORM_PANDA '
+			configs += 'CONFIG_MALI_PLATFORM_PANDA=y '
+		else:
+			defines += '-DCONFIG_MALI_PLATFORM_THIRDPARTY '
+			configs += 'CONFIG_MALI_PLATFORM_THIRDPARTY=y CONFIG_MALI_PLATFORM_THIRDPARTY_NAME=%s ' % env['platform_config']
+	if env['error_inject'] == '1':
+		defines += '-DCONFIG_MALI_ERROR_INJECT '
+		configs += 'CONFIG_MALI_ERROR_INJECT=y '
+	elif env['error_inject'] == '2':
+		defines += '-DCONFIG_MALI_ERROR_INJECT -DCONFIG_MALI_ERROR_INJECT_RANDOM '
+		configs += 'CONFIG_MALI_ERROR_INJECT=y CONFIG_MALI_ERROR_INJECT_RANDOM=y '
+	if int( env['instr'] ):
+		defines += '-DCONFIG_MALI_TRACE_TIMELINE '
+		configs += 'CONFIG_MALI_TRACE_TIMELINE=y '
+
+	# MStar build flags
+	if env['mstar'] == '1':
+		defines += '-DMSTAR '
+		defines += '-DMSTAR_%s ' % env['mstar_platform'].upper()
+		defines += '-D%s ' % env['project'].upper()
+		defines += '-DMALI_MAX_FREQ=%s ' % env['mali_max_freq']
+		defines += '-DMALI_MIN_FREQ=%s ' % env['mali_min_freq']
+		defines += '-DMALI_BASE_ADDRESS=%s ' % env['mali_base_address']
+		defines += '-DMALI_IRQ=%s ' % env['mali_irq']
+		defines += '-DMSTAR_RIU_ENABLED '
+		defines += '-DMSTAR_UMP_MONOLITHIC=%s ' % env['ump_monolithic']
+		defines += '-DMSTAR_UMP_IMPORT_PA=%s ' % env['ump_pa']
+		configs += 'CONFIG_MSTAR_PLATFORM_NAME=%s ' % env['mstar_platform']
+
+		if env['fixed_device_id'] == '1':
+			defines += '-DMSTAR_USE_FIXED_DEVID '
+		if env['ump_monolithic'] == '1':
+			configs += 'CONFIG_MSTAR_UMP_MONOLITHIC=y '
+		if env['ump_pa'] == '1':
+			configs += 'CONFIG_MSTAR_UMP_IMPORT_PA=y '
+
+	return configs + '"' + " " + defines + '"'
+
+env.AddMethod(kernel_get_config_defines)
+
+SConscript( 'src/sconscript' )
+if Glob('tests/sconscript'):
+	SConscript( 'tests/sconscript' )
+
+# NOTE: platform sconscript file is used directly from within src/sconscript
+

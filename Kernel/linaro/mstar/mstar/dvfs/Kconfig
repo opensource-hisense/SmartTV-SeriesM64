@@ -1,0 +1,8 @@
+config MSTAR_DVFS
+bool "Mstar Dynamic Voltage and Frequency Scaling"
+depends on CPU_FREQ
+default n
+
+---help---
+    To enable or to disable Mstar dynamic voltage and frequency scaling mechanism
+

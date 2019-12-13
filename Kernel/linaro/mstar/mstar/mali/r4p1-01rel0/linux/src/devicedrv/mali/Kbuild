@@ -1,0 +1,362 @@
+#
+# Copyright (C) 2010-2011 ARM Limited. All rights reserved.
+# 
+# This program is free software and is provided to you under the terms of the GNU General Public License version 2
+# as published by the Free Software Foundation, and any use by you of this program is subject to the terms of such GNU licence.
+# 
+# A copy of the licence is included with the program, and can also be obtained from Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+#
+
+# This file is called by the Linux build system.
+
+# MSTAR patch begin
+# MStar project config
+include $(src)/../build_system/project/$(CONFIG).mak
+
+# check kernel config
+CHECK_KERNEL_CONFIG ?= 0
+ifeq ($(CHECK_KERNEL_CONFIG),1)
+ifneq ($(MSTAR_PLATFORM),$(patsubst "%",%,$(CONFIG_MSTAR_CHIP_NAME)))
+$(error kernel config ($(CONFIG_MSTAR_CHIP_NAME)) not matched, should be $(MSTAR_PLATFORM))
+endif
+endif
+
+# MStar build options and flags
+ifeq ($(TARGET_PLATFORM), mstar)
+	ifeq ($(MSTAR_PLATFORM),)
+	$(error "MSTAR_PLATFORM must be specified.")
+	endif
+
+	#default build options
+	USING_FIXED_DEVID ?= 0
+	HAVE_ANDROID_OS ?= 0
+	EXTEND_JOB_RUNTIME_WHEN_TIMEOUT ?= 1
+	DUMP_MEMORY_USAGE ?= 1
+
+	# build flags
+	EXTRA_DEFINES += -DMSTAR
+	EXTRA_DEFINES += -DMSTAR_$(shell echo $(MSTAR_PLATFORM) | tr a-z A-Z)
+	EXTRA_DEFINES += -DMSTAR_DISABLE_DMA
+
+	# GPU core
+	ifneq ($(TARGET_GPU),)
+		EXTRA_DEFINES += -D$(TARGET_GPU)
+	endif
+
+	ifneq ($(NUM_PP),)
+		EXTRA_DEFINES += -DNUM_PP=$(NUM_PP)
+	endif
+
+	ifneq ($(GPU_CLOCK),)
+		EXTRA_DEFINES += -DGPU_CLOCK=$(GPU_CLOCK)
+	endif
+
+	ifneq ($(MALI_IRQ),)
+		EXTRA_DEFINES += -DMALI_IRQ=$(MALI_IRQ)
+	endif
+
+	# GPU resources
+	DEDICATED_MEM ?=
+	SHARED_MEM_SIZE ?= 0x40000000
+	FB ?= 0x0,0xf0000000
+
+	ifneq ($(GPU_BASE_ADDRESS),)
+		EXTRA_DEFINES += -DGPU_BASE_ADDRESS=$(GPU_BASE_ADDRESS)
+	endif
+
+	, = ,
+
+	ifneq ($(DEDICATED_MEM),)
+		ifneq ($(words $(subst $(,), ,$(DEDICATED_MEM))),2)
+$(error DEDICATED_MEM: invalid format: $(DEDICATED_MEM))
+		endif
+		EXTRA_DEFINES += -DDEDICATED_MEM_START=$(firstword $(subst $(,), ,$(DEDICATED_MEM)))
+		EXTRA_DEFINES += -DDEDICATED_MEM_SIZE=$(lastword $(subst $(,), ,$(DEDICATED_MEM)))
+	endif
+
+	ifneq ($(SHARED_MEM_SIZE),)
+		EXTRA_DEFINES += -DSHARED_MEM_SIZE=$(SHARED_MEM_SIZE)
+	endif
+
+	ifneq ($(FB),)
+		ifneq ($(words $(subst $(,), ,$(FB))),2)
+$(error FB: invalid format: $(FB))
+		endif
+		EXTRA_DEFINES += -DFB_START=$(firstword $(subst $(,), ,$(FB)))
+		EXTRA_DEFINES += -DFB_SIZE=$(lastword $(subst $(,), ,$(FB)))
+	endif
+
+	ifneq ($(USING_RIU),0)
+		EXTRA_DEFINES += -DMSTAR_RIU_ENABLED
+		EXTRA_DEFINES += -DMSTAR_RIU_ADDRESS_TYPE=$(RIU_ADDRESS_TYPE)
+	endif
+
+	# misc
+	EXTRA_DEFINES += -DHAVE_ANDROID_OS=$(HAVE_ANDROID_OS)
+	EXTRA_DEFINES += -Idrivers/staging  # for sync.h
+
+        ifneq ($(MSTAR_MIU_NUM),0)
+		EXTRA_DEFINES += -DMSTAR_MIU_NUM=$(MSTAR_MIU_NUM)
+	endif
+
+	
+	ifneq ($(USING_FIXED_DEVID),0)
+		EXTRA_DEFINES += -DMSTAR_USING_FIXED_DEVID
+		EXTRA_DEFINES += -Idrivers/mstar/include
+		EXTRA_DEFINES += -Idrivers/mstar2/include
+	endif
+
+	ifneq ($(EXTEND_JOB_RUNTIME_WHEN_TIMEOUT),0)
+		EXTRA_DEFINES += -DMSTAR_EXTEND_JOB_RUNTIME_WHEN_TIMEOUT
+	endif
+
+	ifneq ($(DUMP_MEMORY_USAGE),0)
+		EXTRA_DEFINES += -DMSTAR_DUMP_MEMORY_USAGE
+	endif
+
+	ifneq ($(WATCHDOG_MSECS_DEFAULT),)
+		EXTRA_DEFINES += -DWATCHDOG_MSECS_DEFAULT=$(WATCHDOG_MSECS_DEFAULT)
+	endif
+endif
+# MSTAR patch end
+
+# set up defaults if not defined by the user
+TIMESTAMP ?= default
+OS_MEMORY_KERNEL_BUFFER_SIZE_IN_MB ?= 16
+USING_GPU_UTILIZATION ?= 1
+MALI_PP_SCHEDULER_FORCE_NO_JOB_OVERLAP ?= 0
+MSTAR_STATISTIC_MALI_MIU_USAGE ?= 1
+MALI_PP_SCHEDULER_KEEP_SUB_JOB_STARTS_ALIGNED ?= 0
+MALI_PP_SCHEDULER_FORCE_NO_JOB_OVERLAP_BETWEEN_APPS ?= 0
+MALI_UPPER_HALF_SCHEDULING ?= 1
+MALI_ENABLE_CPU_CYCLES ?= 0
+# MSTAR patch begin
+MSTAR_MIU_NUM ?= 2
+# MSTAR patch end
+
+# For customer releases the Linux Device Drivers will be provided as ARM proprietary and GPL releases:
+# The ARM proprietary product will only include the license/proprietary directory
+# The GPL product will only include the license/gpl directory
+ifeq ($(wildcard $(src)/linux/license/gpl/*),)
+    ccflags-y += -I$(src)/linux/license/proprietary
+    ifeq ($(CONFIG_MALI400_PROFILING),y)
+        $(error Profiling is incompatible with non-GPL license)
+    endif
+    ifeq ($(CONFIG_PM_RUNTIME),y)
+        $(error Runtime PM is incompatible with non-GPL license)
+    endif
+    ifeq ($(CONFIG_DMA_SHARED_BUFFER),y)
+        $(error DMA-BUF is incompatible with non-GPL license)
+    endif
+    $(error Linux Device integration is incompatible with non-GPL license)
+else
+    ccflags-y += -I$(src)/linux/license/gpl
+endif
+
+mali-y += \
+	linux/mali_osk_atomics.o \
+	linux/mali_osk_irq.o \
+	linux/mali_osk_wq.o \
+	linux/mali_osk_locks.o \
+	linux/mali_osk_wait_queue.o \
+	linux/mali_osk_low_level_mem.o \
+	linux/mali_osk_math.o \
+	linux/mali_osk_memory.o \
+	linux/mali_osk_misc.o \
+	linux/mali_osk_mali.o \
+	linux/mali_osk_notification.o \
+	linux/mali_osk_time.o \
+	linux/mali_osk_timers.o
+
+mali-y += linux/mali_memory.o linux/mali_memory_os_alloc.o
+mali-y += linux/mali_memory_external.o
+mali-y += linux/mali_memory_block_alloc.o
+
+mali-y += \
+	linux/mali_ukk_mem.o \
+	linux/mali_ukk_gp.o \
+	linux/mali_ukk_pp.o \
+	linux/mali_ukk_core.o \
+	linux/mali_ukk_soft_job.o \
+	linux/mali_ukk_timeline.o
+
+# Source files which always are included in a build
+mali-y += \
+	common/mali_kernel_core.o \
+	linux/mali_kernel_linux.o \
+	common/mali_kernel_descriptor_mapping.o \
+	common/mali_session.o \
+	linux/mali_device_pause_resume.o \
+	common/mali_kernel_vsync.o \
+	linux/mali_ukk_vsync.o \
+	linux/mali_kernel_sysfs.o \
+	common/mali_mmu.o \
+	common/mali_mmu_page_directory.o \
+	common/mali_mem_validation.o \
+	common/mali_hw_core.o \
+	common/mali_gp.o \
+	common/mali_pp.o \
+	common/mali_pp_job.o \
+	common/mali_gp_job.o \
+	common/mali_soft_job.o \
+	common/mali_scheduler.o \
+	common/mali_gp_scheduler.o \
+	common/mali_pp_scheduler.o \
+	common/mali_group.o \
+	common/mali_dlbu.o \
+	common/mali_broadcast.o \
+	common/mali_pm.o \
+	common/mali_pmu.o \
+	common/mali_user_settings_db.o \
+	common/mali_kernel_utilization.o \
+	common/mali_l2_cache.o \
+	common/mali_dma.o \
+	common/mali_timeline.o \
+	common/mali_timeline_fence_wait.o \
+	common/mali_timeline_sync_fence.o \
+	common/mali_spinlock_reentrant.o \
+	common/mali_pm_domain.o \
+	linux/mali_osk_pm.o \
+	linux/mali_pmu_power_up_down.o \
+	__malidrv_build_info.o
+
+ifneq ($(MALI_PLATFORM_FILES),)
+	mali-y += $(MALI_PLATFORM_FILES:.c=.o)
+endif
+
+# MSTAR patch begin
+ifneq ($(MSTAR_PLATFORM_FILE),)
+	mali-y += $(MSTAR_PLATFORM_FILE:.c=.o)
+endif
+# MSTAR patch end
+
+mali-$(CONFIG_MALI400_PROFILING) += linux/mali_ukk_profiling.o
+mali-$(CONFIG_MALI400_PROFILING) += linux/mali_osk_profiling.o
+
+mali-$(CONFIG_MALI400_INTERNAL_PROFILING) += linux/mali_profiling_internal.o timestamp-$(TIMESTAMP)/mali_timestamp.o
+ccflags-$(CONFIG_MALI400_INTERNAL_PROFILING) += -I$(src)/timestamp-$(TIMESTAMP)
+
+mali-$(CONFIG_DMA_SHARED_BUFFER) += linux/mali_memory_dma_buf.o
+mali-$(CONFIG_SYNC) += linux/mali_sync.o
+ccflags-$(CONFIG_SYNC) += -Idrivers/staging/android
+
+mali-$(CONFIG_MALI400_UMP) += linux/mali_memory_ump.o
+
+mali-$(CONFIG_MALI400_POWER_PERFORMANCE_POLICY) += common/mali_power_performance_policy.o
+
+# Tell the Linux build system from which .o file to create the kernel module
+obj-$(CONFIG_MALI400) := mali.o
+
+# MSTAR patch begin
+ccflags-y += $(EXTRA_DEFINES) $(CONFIG_BUILDFLAGS)
+# MSTAR patch end
+
+# Set up our defines, which will be passed to gcc
+ccflags-y += -DMALI_PP_SCHEDULER_FORCE_NO_JOB_OVERLAP=$(MALI_PP_SCHEDULER_FORCE_NO_JOB_OVERLAP)
+ccflags-y += -DMALI_PP_SCHEDULER_KEEP_SUB_JOB_STARTS_ALIGNED=$(MALI_PP_SCHEDULER_KEEP_SUB_JOB_STARTS_ALIGNED)
+ccflags-y += -DMALI_PP_SCHEDULER_FORCE_NO_JOB_OVERLAP_BETWEEN_APPS=$(MALI_PP_SCHEDULER_FORCE_NO_JOB_OVERLAP_BETWEEN_APPS)
+# MSTAR patch begin
+ifeq ($(shell test $(SUBLEVEL) -gt 32 -a $(PATCHLEVEL) = 6 -a $(VERSION) = 2 -o $(VERSION) -gt 2 && echo "OK"),OK)
+# MALI_STATE_TRACKING is only supported on Linux kernels from version 2.6.32.
+ccflags-y += -DMALI_STATE_TRACKING=1
+else
+ccflags-y += -DMALI_STATE_TRACKING=0
+endif
+# MSTAR patch end
+ccflags-y += -DMALI_OS_MEMORY_KERNEL_BUFFER_SIZE_IN_MB=$(OS_MEMORY_KERNEL_BUFFER_SIZE_IN_MB)
+ccflags-y += -DUSING_GPU_UTILIZATION=$(USING_GPU_UTILIZATION)
+ccflags-y += -DMALI_ENABLE_CPU_CYCLES=$(MALI_ENABLE_CPU_CYCLES)
+ccflags-y += -DMSTAR_STATISTIC_MALI_MIU_USAGE=$(MSTAR_STATISTIC_MALI_MIU_USAGE)
+
+ifeq ($(MALI_UPPER_HALF_SCHEDULING),1)
+	ccflags-y += -DMALI_UPPER_HALF_SCHEDULING
+endif
+
+ccflags-$(CONFIG_MALI400_UMP) += -I$(src)/../../ump/include/ump
+ccflags-$(CONFIG_MALI400_DEBUG) += -DDEBUG
+
+# Use our defines when compiling
+ccflags-y += -I$(src) -I$(src)/include -I$(src)/common -I$(src)/linux -I$(src)/platform
+
+# Get subversion revision number, fall back to only ${MALI_RELEASE_NAME} if no svn info is available
+MALI_RELEASE_NAME=$(shell cat $(src)/.version 2> /dev/null)
+
+# MSTAR patch start
+ifeq ($(TARGET_PLATFORM), mstar)
+ifeq ($(wildcard $(src)/../../../version_info.mak),)
+	$(error version_info.mak not found)
+endif
+
+LIBCL :=
+$(eval $(shell grep "LIBCL\s*=" $(src)/../../../version_info.mak))
+ifeq ($(strip $(LIBCL)),)
+	$(error LIBCL not found in version_info.mak)
+endif
+
+LIBCL := $(strip $(shell (cd $(src); echo "$(LIBCL)" | grep '^Change: '| sed -e 's/^Change: //' ) 2>/dev/null ))
+ifeq ($(LIBCL),)
+	$(error LIBCL invalid format)
+endif
+
+DRIVER_REV := $(MALI_RELEASE_NAME)-CL$(LIBCL)
+CHANGE_DATE := $(MALI_RELEASE_NAME)
+CHANGED_REVISION := $(MALI_RELEASE_NAME)
+else
+SVN_INFO = (cd $(src); svn info 2>/dev/null)
+
+ifneq ($(shell $(SVN_INFO) 2>/dev/null),)
+# SVN detected
+SVN_REV := $(shell $(SVN_INFO) | grep '^Revision: '| sed -e 's/^Revision: //' 2>/dev/null)
+DRIVER_REV := $(MALI_RELEASE_NAME)-r$(SVN_REV)
+CHANGE_DATE := $(shell $(SVN_INFO) | grep '^Last Changed Date: ' | cut -d: -f2- | cut -b2-)
+CHANGED_REVISION := $(shell $(SVN_INFO) | grep '^Last Changed Rev: ' | cut -d: -f2- | cut -b2-)
+REPO_URL := $(shell $(SVN_INFO) | grep '^URL: ' | cut -d: -f2- | cut -b2-)
+
+else # SVN
+GIT_REV := $(shell cd $(src); git describe --always 2>/dev/null)
+ifneq ($(GIT_REV),)
+# Git detected
+DRIVER_REV := $(MALI_RELEASE_NAME)-$(GIT_REV)
+CHANGE_DATE := $(shell cd $(src); git log -1 --format="%ci")
+CHANGED_REVISION := $(GIT_REV)
+REPO_URL := $(shell cd $(src); git describe --all --always 2>/dev/null)
+
+else # Git
+# No Git or SVN detected
+DRIVER_REV := $(MALI_RELEASE_NAME)
+CHANGE_DATE := $(MALI_RELEASE_NAME)
+CHANGED_REVISION := $(MALI_RELEASE_NAME)
+endif
+endif
+endif
+# MSTAR patch end
+
+ccflags-y += -DSVN_REV_STRING=\"$(DRIVER_REV)\"
+
+VERSION_STRINGS :=
+VERSION_STRINGS += API_VERSION=$(shell cd $(src); grep "\#define _MALI_API_VERSION" $(FILES_PREFIX)include/linux/mali/mali_utgard_uk_types.h | cut -d' ' -f 3 )
+VERSION_STRINGS += REPO_URL=$(REPO_URL)
+VERSION_STRINGS += REVISION=$(DRIVER_REV)
+VERSION_STRINGS += CHANGED_REVISION=$(CHANGED_REVISION)
+VERSION_STRINGS += CHANGE_DATE=$(CHANGE_DATE)
+VERSION_STRINGS += BUILD_DATE=$(shell date)
+ifdef CONFIG_MALI400_DEBUG
+VERSION_STRINGS += BUILD=debug
+else
+VERSION_STRINGS += BUILD=release
+endif
+VERSION_STRINGS += TARGET_PLATFORM=$(TARGET_PLATFORM)
+VERSION_STRINGS += MALI_PLATFORM=$(MALI_PLATFORM)
+VERSION_STRINGS += KDIR=$(KDIR)
+VERSION_STRINGS += OS_MEMORY_KERNEL_BUFFER_SIZE_IN_MB=$(OS_MEMORY_KERNEL_BUFFER_SIZE_IN_MB)
+VERSION_STRINGS += USING_UMP=$(CONFIG_MALI400_UMP)
+VERSION_STRINGS += USING_PROFILING=$(CONFIG_MALI400_PROFILING)
+VERSION_STRINGS += USING_INTERNAL_PROFILING=$(CONFIG_MALI400_INTERNAL_PROFILING)
+VERSION_STRINGS += USING_GPU_UTILIZATION=$(USING_GPU_UTILIZATION)
+VERSION_STRINGS += USING_POWER_PERFORMANCE_POLICY=$(CONFIG_POWER_PERFORMANCE_POLICY)
+VERSION_STRINGS += MALI_UPPER_HALF_SCHEDULING=$(MALI_UPPER_HALF_SCHEDULING)
+
+# Create file with Mali driver configuration
+$(src)/__malidrv_build_info.c:
+	@echo 'const char *__malidrv_build_info(void) { return "malidrv: $(VERSION_STRINGS)";}' > $(src)/__malidrv_build_info.c

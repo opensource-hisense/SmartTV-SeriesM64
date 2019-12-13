@@ -1,0 +1,5 @@
+LIBMALI_1.0 {
+local:
+   LLVM*; _Z*;
+};
+
